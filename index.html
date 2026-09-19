@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#FFF8F5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>好好生活 · 工作台</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="工作台">
+</head>
+<body>
+
+<div class="blob b1"></div>
+<div class="blob b2"></div>
+<div class="blob b3"></div>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand"><span class="logo">🌸</span><span>好好生活</span></div>
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-view="today">今天</button>
+      <button class="tab" data-view="history">历史</button>
+    </div>
+  </div>
+</header>
+
+<main class="view active" id="viewToday">
+  <div class="wrap">
+
+    <header class="hero">
+      <div class="hero-left" style="min-width:0">
+        <div class="date-line">
+          <span id="dateText">—</span>
+          <span class="sep"></span>
+          <span id="yiText">宜 · 认真生活</span>
+        </div>
+        <h1 id="heroTitle">今天也要<span class="hl">好好生活</span>呀</h1>
+        <p class="sub" id="greet">早上好～</p>
+      </div>
+      <div class="ring" id="ring">
+        <div class="ring-in">
+          <strong id="pct">0%</strong>
+          <span>完成度</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="date-strip" id="dateStrip"></div>
+
+    <div class="grid">
+
+      <section class="card todo-card">
+        <div class="card-head">
+          <h2 id="todoLabel">📝 今日待办</h2>
+          <span id="counter" style="font-size:13px;color:#B9A8AF;font-weight:600">0 / 0</span>
+        </div>
+
+        <div class="cats" id="cats">
+          <button class="cat active" data-cat="work">💼 工作</button>
+          <button class="cat" data-cat="study">📖 学习</button>
+          <button class="cat" data-cat="life">🌿 生活</button>
+          <button class="cat" data-cat="other">✨ 其他</button>
+        </div>
+
+        <div class="add-row">
+          <input id="input" type="text" placeholder="今天想完成什么呢～" maxlength="60" autocomplete="off">
+          <button id="addBtn" class="add-btn" aria-label="添加">＋</button>
+        </div>
+
+        <ul class="list" id="list"></ul>
+
+        <div class="empty" id="empty">
+          <div class="empty-emoji">🌷</div>
+          还没有待办哦<br>写下今天的第一件小事吧～
+        </div>
+      </section>
+
+      <aside class="side">
+
+        <section class="card">
+          <h2 id="moodLabel">🌈 今日心情</h2>
+          <div class="moods" id="moods"></div>
+          <p class="mood-tip" id="moodTip">点一下记录今天的心情吧</p>
+        </section>
+
+        <section class="card">
+          <h2 id="noteLabel" style="margin-bottom:13px">💭 今日碎碎念</h2>
+          <textarea id="note" placeholder="随便写点什么吧，开心的、烦恼的、想记住的…" maxlength="500"></textarea>
+        </section>
+
+      </aside>
+    </div>
+
+    <footer class="foot">
+      <p class="quote" id="quote"></p>
+      <p>made with ♡ · 记录每一天的小进步</p>
+    </footer>
+
+  </div>
+</main>
+
+<main class="view" id="viewHistory">
+  <div class="wrap">
+    <div class="history-grid">
+
+      <section class="card">
+        <div class="cal-head">
+          <button class="cal-nav" id="prevMonth" aria-label="上个月">‹</button>
+          <div class="cal-title" id="calTitle" title="点击回到今天">
+            <span id="calTitleText">—</span>
+            <span class="hint">回到今天</span>
+          </div>
+          <button class="cal-nav" id="nextMonth" aria-label="下个月">›</button>
+        </div>
+
+        <div class="cal-week">
+          <span>一</span><span>二</span><span>三</span><span>四</span>
+          <span>五</span><span>六</span><span>日</span>
+        </div>
+
+        <div class="cal-grid" id="calGrid"></div>
+
+        <div class="cal-legend">
+          <i><span class="g-dot"></span>有记录</i>
+          <i><span class="g-today"></span>今天</i>
+          <i>点日期查看当天</i>
+        </div>
+      </section>
+
+      <section class="card detail-card" id="detailCard">
+        <div class="detail-head">
+          <h2 id="detailDate">—</h2>
+          <span class="badge" id="detailBadge" style="display:none">今天</span>
+        </div>
+        <div id="detailBody"></div>
+      </section>
+
+    </div>
+  </div>
+</main>
+
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
+<script src="js/today.js"></script>
+<script src="js/history.js"></script>
+<script src="js/app.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('./sw.js').catch(function () {});
+  });
+}
+</script>
+
+</body>
+</html>
