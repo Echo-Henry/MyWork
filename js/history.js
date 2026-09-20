@@ -2,10 +2,11 @@
   'use strict';
 
   const { $, $$, esc, makeKey } = App.util;
-  const { CATS, WEEK_CN } = App.config;
+  const { CATS, WEEK_CN } = App.config;   // ★ WEEK_CN 在这里
   const store = App.store;
 
   let selectedKey = '';
+  let searchKeyword = '';
 
   /* ============ 渲染日历 ============ */
   function renderCalendar() {
@@ -50,7 +51,7 @@
     }
   }
 
-  /* ============ 渲染详情 ============ */
+  /* ============ 渲染某天详情 ============ */
   function renderDetail(key) {
     if (!key) return;
 
@@ -98,6 +99,95 @@
     else html += '<p class="d-empty">这天没有写碎碎念</p>';
     html += '</div>';
 
+    bodyEl.innerHTML = html;
+  }
+
+  /* ============ 搜索历史 ============ */
+  function searchHistory(keyword) {
+    const kw = String(keyword || '').toLowerCase().trim();
+    if (!kw) return [];
+
+    const allData = (store.getAll ? store.getAll() : {}) || {};
+    const results = [];
+
+    const keys = Object.keys(allData)
+      .filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k))
+      .sort()
+      .reverse();
+
+    keys.forEach(dateKey => {
+      const d = allData[dateKey];
+      if (!d || typeof d !== 'object') return;
+
+      if (Array.isArray(d.todos)) {
+        d.todos.forEach(t => {
+          if (t.text && t.text.toLowerCase().indexOf(kw) !== -1) {
+            results.push({
+              date: dateKey,
+              type: 'todo',
+              text: t.text,
+              done: !!t.done
+            });
+          }
+        });
+      }
+
+      if (d.note && d.note.toLowerCase().indexOf(kw) !== -1) {
+        results.push({
+          date: dateKey,
+          type: 'note',
+          text: d.note
+        });
+      }
+    });
+
+    return results;
+  }
+
+  /* ============ 渲染搜索结果 ============ */
+  function renderSearchResults(keyword) {
+    const bodyEl = $('#detailBody');
+    const dateEl = $('#detailDate');
+    const badgeEl = $('#detailBadge');
+    if (!bodyEl) return;
+
+    if (badgeEl) badgeEl.style.display = 'none';
+    if (dateEl) dateEl.textContent = '🔍 搜索结果';
+
+    const results = searchHistory(keyword);
+
+    if (!results.length) {
+      bodyEl.innerHTML = '<div class="search-empty">'
+        + '<span class="em">🌱</span>'
+        + '没有找到匹配的记录<br>换个词试试吧～'
+        + '</div>';
+      return;
+    }
+
+    let html = '<p class="search-count">共找到 ' + results.length + ' 条记录（点任意一条可跳转当天）</p>';
+    html += '<div class="search-results">';
+
+    results.forEach(r => {
+      const dp = r.date.split('-');
+      const dateLabel = (+dp[1]) + '月' + (+dp[2]) + '日';
+      const wd = WEEK_CN[new Date(+dp[0], +dp[1] - 1, +dp[2]).getDay()];
+
+      if (r.type === 'todo') {
+        html += '<div class="search-item" data-date="' + r.date + '">'
+          + '<span class="si-date">' + dateLabel + ' 周' + wd + '</span>'
+          + '<span class="si-icon">' + (r.done ? '✅' : '⬜') + '</span>'
+          + '<span class="si-text">' + esc(r.text) + '</span>'
+          + '</div>';
+      } else {
+        html += '<div class="search-item" data-date="' + r.date + '">'
+          + '<span class="si-date">' + dateLabel + ' 周' + wd + '</span>'
+          + '<span class="si-icon">💭</span>'
+          + '<span class="si-text">' + esc(r.text) + '</span>'
+          + '</div>';
+      }
+    });
+
+    html += '</div>';
     bodyEl.innerHTML = html;
   }
 
@@ -168,6 +258,27 @@
     const body = $('#detailBody');
     if (body) {
       body.addEventListener('click', function (e) {
+        /* 搜索结果点击 → 跳转到那天 */
+        const searchItem = e.target.closest('.search-item');
+        if (searchItem) {
+          const date = searchItem.dataset.date;
+          const si = $('#searchInput');
+          if (si) si.value = '';
+          const sc = $('#searchClear');
+          if (sc) sc.style.display = 'none';
+          searchKeyword = '';
+
+          const dp = date.split('-');
+          App.state.calYear = +dp[0];
+          App.state.calMonth = +dp[1];
+          selectedKey = date;
+          App.state.calSelectedKey = date;
+          renderCalendar();
+          renderDetail(date);
+          return;
+        }
+
+        /* 普通详情打勾 */
         const li = e.target.closest('.d-item');
         if (!li) return;
         if (!e.target.closest('.h-check') && !e.target.closest('.h-txt')) return;
@@ -188,6 +299,46 @@
       });
     }
 
+    /* 搜索框 */
+    const si = $('#searchInput');
+    const sc = $('#searchClear');
+
+    if (si) {
+      si.addEventListener('input', function () {
+        const v = si.value.trim();
+        searchKeyword = v;
+        if (sc) sc.style.display = v ? 'grid' : 'none';
+
+        const calCard = $('#calCard');
+        const detailCard = $('#detailCard');
+
+        if (v) {
+          if (calCard) calCard.style.display = 'none';
+          if (detailCard) detailCard.style.gridColumn = '1 / -1';
+          renderSearchResults(v);
+        } else {
+          if (calCard) calCard.style.display = '';
+          if (detailCard) detailCard.style.gridColumn = '';
+          renderCalendar();
+          renderDetail(selectedKey);
+        }
+      });
+    }
+
+    if (sc) {
+      sc.addEventListener('click', function () {
+        if (si) si.value = '';
+        searchKeyword = '';
+        sc.style.display = 'none';
+        const calCard = $('#calCard');
+        const detailCard = $('#detailCard');
+        if (calCard) calCard.style.display = '';
+        if (detailCard) detailCard.style.gridColumn = '';
+        renderCalendar();
+        renderDetail(selectedKey);
+      });
+    }
+
     renderCalendar();
     renderDetail(selectedKey);
   }
@@ -195,6 +346,15 @@
   function refresh() {
     if (!selectedKey) selectedKey = App.state.todayKey;
     App.state.calSelectedKey = selectedKey;
+
+    const si = $('#searchInput');
+    if (si && si.value.trim()) {
+      const calCard = $('#calCard');
+      if (calCard) calCard.style.display = 'none';
+      renderSearchResults(si.value.trim());
+      return;
+    }
+
     renderCalendar();
     renderDetail(selectedKey);
   }

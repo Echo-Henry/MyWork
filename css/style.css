@@ -374,3 +374,79 @@ body{
   .dchip{min-width:50px;padding:6px 9px}
   .dchip .d{font-size:12.5px}
 }
+
+/* ============ 历史搜索 ============ */
+.search-card{
+  padding:14px 18px;
+  margin-bottom:20px;
+}
+.search-box{
+  display:flex;align-items:center;gap:10px;
+  background:#FFFBFB;
+  border:1.5px solid var(--line);
+  border-radius:15px;
+  padding:10px 14px;
+  transition:all .22s;
+}
+.search-box:focus-within{
+  border-color:var(--pink-2);
+  background:#fff;
+  box-shadow:0 0 0 4px rgba(255,122,156,.1);
+}
+.search-icon{font-size:15px;flex:0 0 auto;opacity:.7}
+#searchInput{
+  flex:1;min-width:0;
+  border:none;background:transparent;
+  font-size:14.5px;font-family:inherit;
+  color:var(--text);outline:none;
+}
+#searchInput::placeholder{color:#CDBFC4}
+.search-clear{
+  border:none;background:#FFE8EE;color:var(--pink);
+  width:24px;height:24px;border-radius:50%;
+  font-size:12px;line-height:1;
+  cursor:pointer;font-family:inherit;flex:0 0 auto;
+  display:grid;place-items:center;transition:transform .15s;
+}
+.search-clear:active{transform:scale(.9)}
+
+.search-results{display:flex;flex-direction:column;gap:4px}
+.search-item{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:11px 12px;border-radius:14px;
+  background:#FFFBFB;border:1.5px solid transparent;
+  cursor:pointer;transition:all .18s;
+}
+.search-item:hover{
+  background:#FFF3F7;border-color:#FFE0EA;
+}
+.si-date{
+  flex:0 0 auto;font-size:11.5px;font-weight:800;
+  color:var(--pink);background:#FFF3F7;
+  padding:3px 8px;border-radius:8px;
+  letter-spacing:-.2px;white-space:nowrap;margin-top:1px;
+}
+.si-icon{flex:0 0 auto;font-size:14px;line-height:1.6}
+.si-text{
+  flex:1;min-width:0;font-size:14px;
+  line-height:1.6;color:var(--text);
+  word-break:break-word;
+}
+.search-count{
+  font-size:12.5px;color:var(--text-2);
+  margin-bottom:12px;letter-spacing:.2px;
+}
+.search-empty{
+  text-align:center;padding:30px 0;
+  color:#CDBFC4;font-size:13px;line-height:2;
+}
+.search-empty .em{font-size:32px;display:block;margin-bottom:8px}
+
+@media (max-width:640px){
+  .search-card{padding:11px 14px;margin-bottom:14px}
+  .search-box{padding:9px 12px;border-radius:14px}
+  #searchInput{font-size:14px}
+  .search-item{padding:10px 10px;gap:8px}
+  .si-date{font-size:11px;padding:2px 7px}
+  .si-text{font-size:13.5px}
+}
