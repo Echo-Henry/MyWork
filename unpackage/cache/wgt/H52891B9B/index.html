@@ -4,13 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#FFF8F5">
-<meta name="apple-mobile-web-app-capable" content="yes">
 <title>好好生活 · 工作台</title>
 <link rel="stylesheet" href="css/style.css">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="工作台">
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </head>
 <body>
 
@@ -21,16 +17,18 @@
 <header class="top">
   <div class="top-inner">
     <div class="brand"><span class="logo">🌸</span><span>好好生活</span></div>
-    <div class="tabs" id="tabs">
-      <button class="tab active" data-view="today">今天</button>
-      <button class="tab" data-view="history">历史</button>
+    <div class="top-right">
+      <button class="settings-btn" onclick="App.today.openSettings()" aria-label="设置" title="设置">⚙️</button>
+      <div class="tabs" id="tabs">
+        <button class="tab active" data-view="today">今天</button>
+        <button class="tab" data-view="history">历史</button>
+      </div>
     </div>
   </div>
 </header>
 
 <main class="view active" id="viewToday">
   <div class="wrap">
-
     <header class="hero">
       <div class="hero-left" style="min-width:0">
         <div class="date-line">
@@ -52,27 +50,22 @@
     <div class="date-strip" id="dateStrip"></div>
 
     <div class="grid">
-
       <section class="card todo-card">
         <div class="card-head">
           <h2 id="todoLabel">📝 今日待办</h2>
           <span id="counter" style="font-size:13px;color:#B9A8AF;font-weight:600">0 / 0</span>
         </div>
-
         <div class="cats" id="cats">
           <button class="cat active" data-cat="work">💼 工作</button>
           <button class="cat" data-cat="study">📖 学习</button>
           <button class="cat" data-cat="life">🌿 生活</button>
           <button class="cat" data-cat="other">✨ 其他</button>
         </div>
-
         <div class="add-row">
-          <input id="input" type="text" placeholder="今天想完成什么呢～" maxlength="60" autocomplete="off">
+          <input id="input" type="text" placeholder="只需输入待办事项内容，系统会自动排序" maxlength="60" autocomplete="off">
           <button id="addBtn" class="add-btn" aria-label="添加">＋</button>
         </div>
-
         <ul class="list" id="list"></ul>
-
         <div class="empty" id="empty">
           <div class="empty-emoji">🌷</div>
           还没有待办哦<br>写下今天的第一件小事吧～
@@ -80,18 +73,15 @@
       </section>
 
       <aside class="side">
-
         <section class="card">
           <h2 id="moodLabel">🌈 今日心情</h2>
           <div class="moods" id="moods"></div>
           <p class="mood-tip" id="moodTip">点一下记录今天的心情吧</p>
         </section>
-
         <section class="card">
           <h2 id="noteLabel" style="margin-bottom:13px">💭 今日碎碎念</h2>
           <textarea id="note" placeholder="随便写点什么吧，开心的、烦恼的、想记住的…" maxlength="500"></textarea>
         </section>
-
       </aside>
     </div>
 
@@ -99,15 +89,23 @@
       <p class="quote" id="quote"></p>
       <p>made with ♡ · 记录每一天的小进步</p>
     </footer>
-
   </div>
 </main>
 
 <main class="view" id="viewHistory">
   <div class="wrap">
-    <div class="history-grid">
 
-      <section class="card">
+    <!-- 🔍 历史搜索框 -->
+    <section class="card search-card">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input id="searchInput" type="text" placeholder="搜索历史待办或碎碎念…" autocomplete="off">
+        <button id="searchClear" class="search-clear" style="display:none">✕</button>
+      </div>
+    </section>
+
+    <div class="history-grid">
+      <section class="card" id="calCard">
         <div class="cal-head">
           <button class="cal-nav" id="prevMonth" aria-label="上个月">‹</button>
           <div class="cal-title" id="calTitle" title="点击回到今天">
@@ -116,14 +114,11 @@
           </div>
           <button class="cal-nav" id="nextMonth" aria-label="下个月">›</button>
         </div>
-
         <div class="cal-week">
           <span>一</span><span>二</span><span>三</span><span>四</span>
           <span>五</span><span>六</span><span>日</span>
         </div>
-
         <div class="cal-grid" id="calGrid"></div>
-
         <div class="cal-legend">
           <i><span class="g-dot"></span>有记录</i>
           <i><span class="g-today"></span>今天</i>
@@ -138,23 +133,74 @@
         </div>
         <div id="detailBody"></div>
       </section>
-
     </div>
   </div>
 </main>
+
+<div id="settingsModal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <h2>⚙️ 设置</h2>
+    <div class="setting-item">
+      <h3>📦 数据备份与恢复</h3>
+      <p class="desc">不联网工具换手机最怕数据丢失，导出加密文件，换机无忧。</p>
+      <button class="btn" onclick="App.today.exportData()">📤 导出加密数据</button>
+      <button class="btn ghost" onclick="document.getElementById('importFile').click()">📥 导入数据</button>
+      <input type="file" id="importFile" style="display:none" accept=".workbench" onchange="App.today.importData(this.files[0])">
+    </div>
+    <div class="setting-item">
+      <h3>📄 明文导出</h3>
+      <p class="desc">导出为 Markdown 格式，方便阅读或复制到其他笔记软件。</p>
+      <button class="btn ghost" onclick="App.today.exportMarkdown('day')">📝 导出今日明文</button>
+      <button class="btn ghost" onclick="App.today.exportMarkdown('month')">📅 导出当月明文</button>
+    </div>
+    <div class="setting-item">
+      <h3>🤖 AI 月度总结</h3>
+      <p class="desc">基于本地数据，月底生成专属总结，数据不上传。当前为本地模拟版。</p>
+      <button class="btn" onclick="App.today.generateAISummary()">✨ 生成本月总结</button>
+    </div>
+    <div class="setting-item" style="border:none;">
+      <button class="btn danger" onclick="App.today.closeSettings()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div id="remindModal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <h2>⏰ 设置提醒</h2>
+    <div class="remind-task" id="remindTask">—</div>
+    <div class="remind-field">
+      <label>📅 日期</label>
+      <input type="date" id="remindDate">
+    </div>
+    <div class="remind-field">
+      <label>🕐 时间</label>
+      <input type="time" id="remindTime">
+    </div>
+    <div class="remind-quick">
+      <button class="chip" onclick="App.today.quickRemind(0)">今晚 20:00</button>
+      <button class="chip" onclick="App.today.quickRemind(1)">明早 09:00</button>
+      <button class="chip" onclick="App.today.quickRemind(2)">后天 09:00</button>
+    </div>
+    <p class="remind-tip">💡 安卓端已启用系统级闹钟，应用关闭也能提醒</p>
+    <button class="btn" onclick="App.today.saveRemind()">✅ 保存提醒</button>
+    <button class="btn ghost" onclick="App.today.clearRemind()">🗑️ 清除提醒</button>
+    <button class="btn danger" onclick="App.today.closeRemind()">取消</button>
+  </div>
+</div>
+
+<div id="outputModal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <h2 id="outputTitle">📄 数据导出</h2>
+    <textarea id="outputText" readonly style="width:100%;height:200px;border:1.5px solid var(--line);border-radius:12px;padding:10px;font-size:13px;line-height:1.7;resize:none;margin-bottom:12px;background:#FFFBFB;font-family:inherit;color:var(--text);"></textarea>
+    <button class="btn" onclick="App.today.copyOutput()">📋 复制内容</button>
+    <button class="btn ghost" onclick="document.getElementById('outputModal').style.display='none'">关闭</button>
+  </div>
+</div>
 
 <script src="js/config.js"></script>
 <script src="js/store.js"></script>
 <script src="js/today.js"></script>
 <script src="js/history.js"></script>
 <script src="js/app.js"></script>
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function () {
-    navigator.serviceWorker.register('./sw.js').catch(function () {});
-  });
-}
-</script>
-
 </body>
 </html>

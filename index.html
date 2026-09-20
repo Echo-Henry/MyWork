@@ -62,7 +62,7 @@
           <button class="cat" data-cat="other">✨ 其他</button>
         </div>
         <div class="add-row">
-          <input id="input" type="text" placeholder="只需输入待办事项内容，系统会自动排序" maxlength="60" autocomplete="off">
+          <input id="input" type="text" placeholder="只需输入待办事项内容，系统会自动排序" maxlength="200" autocomplete="off">
           <button id="addBtn" class="add-btn" aria-label="添加">＋</button>
         </div>
         <ul class="list" id="list"></ul>
@@ -94,8 +94,6 @@
 
 <main class="view" id="viewHistory">
   <div class="wrap">
-
-    <!-- 🔍 历史搜索框 -->
     <section class="card search-card">
       <div class="search-box">
         <span class="search-icon">🔍</span>
@@ -155,36 +153,12 @@
     </div>
     <div class="setting-item">
       <h3>🤖 AI 月度总结</h3>
-      <p class="desc">基于本地数据，月底生成专属总结，数据不上传。当前为本地模拟版。</p>
+      <p class="desc">基于本地数据，月底生成专属总结，数据不上传。</p>
       <button class="btn" onclick="App.today.generateAISummary()">✨ 生成本月总结</button>
     </div>
     <div class="setting-item" style="border:none;">
       <button class="btn danger" onclick="App.today.closeSettings()">关闭</button>
     </div>
-  </div>
-</div>
-
-<div id="remindModal" class="modal" style="display:none;">
-  <div class="modal-content">
-    <h2>⏰ 设置提醒</h2>
-    <div class="remind-task" id="remindTask">—</div>
-    <div class="remind-field">
-      <label>📅 日期</label>
-      <input type="date" id="remindDate">
-    </div>
-    <div class="remind-field">
-      <label>🕐 时间</label>
-      <input type="time" id="remindTime">
-    </div>
-    <div class="remind-quick">
-      <button class="chip" onclick="App.today.quickRemind(0)">今晚 20:00</button>
-      <button class="chip" onclick="App.today.quickRemind(1)">明早 09:00</button>
-      <button class="chip" onclick="App.today.quickRemind(2)">后天 09:00</button>
-    </div>
-    <p class="remind-tip">💡 安卓端已启用系统级闹钟，应用关闭也能提醒</p>
-    <button class="btn" onclick="App.today.saveRemind()">✅ 保存提醒</button>
-    <button class="btn ghost" onclick="App.today.clearRemind()">🗑️ 清除提醒</button>
-    <button class="btn danger" onclick="App.today.closeRemind()">取消</button>
   </div>
 </div>
 

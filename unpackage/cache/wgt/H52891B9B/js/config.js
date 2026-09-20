@@ -38,7 +38,11 @@ window.App = window.App || {};
     YIS: ['宜 · 认真生活', '宜 · 慢慢来', '宜 · 喝杯热奶茶', '宜 · 完成小事',
           '宜 · 早睡', '宜 · 犒劳自己', '宜 · 晒晒太阳', '宜 · 整理房间'],
 
-    WEEK_CN: ['日', '一', '二', '三', '四', '五', '六']
+    WEEK_CN: ['日', '一', '二', '三', '四', '五', '六'],
+
+    // 预留 AI 配置（未来填智谱等平台的 API Key）
+    AI_API_KEY: '94591c21cfa44e9da2e1d67ca6d088f6.J2nNOPj6LDQsSIlP',
+    AI_API_URL: 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
   };
 
   App.state = {

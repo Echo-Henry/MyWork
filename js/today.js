@@ -9,7 +9,6 @@
   let lastAllDone = false;
   let noteTimer = null;
   let noteEl = null;
-  let remindTarget = null; // { dateKey, id }
 
   const pad2 = n => String(n).padStart(2, '0');
 
@@ -103,40 +102,6 @@
     noteEl.value = App.state.day.note;
   }
 
-  /* ============ 提醒时间格式化 ============ */
-  function formatRemind(remind) {
-    if (!remind) return '';
-    // remind 格式: 'YYYY-MM-DD HH:MM'
-    const p = remind.split(' ');
-    if (p.length !== 2) return remind;
-    const datePart = p[0];
-    const timePart = p[1];
-    const todayKey = App.state.todayKey;
-    if (datePart === todayKey) {
-      return '今天 ' + timePart;
-    }
-    // 判断是不是明天 / 后天
-    const dp = datePart.split('-');
-    const dDate = new Date(+dp[0], +dp[1] - 1, +dp[2]);
-    const t = new Date();
-    t.setHours(0, 0, 0, 0);
-    const diff = Math.round((dDate - t) / 86400000);
-    if (diff === 1) return '明天 ' + timePart;
-    if (diff === 2) return '后天 ' + timePart;
-    return (dp[1]) + '/' + (dp[2]) + ' ' + timePart;
-  }
-
-  function isOverdue(remind) {
-    if (!remind) return false;
-    return remind < nowStr();
-  }
-
-  function nowStr() {
-    const n = new Date();
-    return n.getFullYear() + '-' + pad2(n.getMonth() + 1) + '-' + pad2(n.getDate())
-      + ' ' + pad2(n.getHours()) + ':' + pad2(n.getMinutes());
-  }
-
   /* ============ 待办列表 ============ */
   function renderTodayList(newestId) {
     const day = App.state.day;
@@ -178,14 +143,6 @@
       txt.className = 'txt';
       txt.textContent = t.text;
 
-      // 提醒标签
-      let remindTag = null;
-      if (t.remind) {
-        remindTag = document.createElement('span');
-        remindTag.className = 'remind-badge' + (isOverdue(t.remind) ? ' overdue' : '');
-        remindTag.textContent = '⏰ ' + formatRemind(t.remind);
-      }
-
       const tag = document.createElement('span');
       tag.className = 'tag';
       tag.dataset.cat = key;
@@ -194,11 +151,6 @@
       const star = document.createElement('span');
       star.className = 'star-btn' + (t.starred ? ' active' : '');
       star.innerHTML = t.starred ? '⭐' : '☆';
-
-      const bell = document.createElement('span');
-      bell.className = 'bell-btn' + (t.remind ? ' active' : '');
-      bell.innerHTML = t.remind ? '🔔' : '🔕';
-      bell.title = t.remind ? ('提醒时间: ' + t.remind) : '点击设置定时提醒';
 
       const edit = document.createElement('button');
       edit.className = 'edit';
@@ -215,10 +167,8 @@
       li.appendChild(num);
       li.appendChild(check);
       li.appendChild(txt);
-      if (remindTag) li.appendChild(remindTag);
       li.appendChild(tag);
       li.appendChild(star);
-      li.appendChild(bell);
       li.appendChild(edit);
       li.appendChild(del);
       listEl.appendChild(li);
@@ -279,7 +229,7 @@
     const text = input.value.trim();
     if (!text) { input.focus(); return; }
 
-    const item = { id: uid(), text: text, cat: curCat, done: false, starred: false, remind: '' };
+    const item = { id: uid(), text: text, cat: curCat, done: false, starred: false };
     App.state.day.todos.push(item);
     input.value = '';
     store.save();
@@ -295,15 +245,34 @@
     const txt = li.querySelector('.txt');
     if (!txt) return;
 
-    const input = document.createElement('input');
-    input.type = 'text';
+    /* ★ 用 textarea 代替 input，自动撑高，能看到全部内容 */
+    const input = document.createElement('textarea');
     input.className = 'edit-input';
     input.value = t.text;
-    input.maxLength = 60;
+    input.maxLength = 200;
+    input.rows = 1;
+    input.setAttribute('aria-label', '修改待办');
 
     li.replaceChild(input, txt);
+
+    /* 自动调整高度：内容多高，框就多高（最多 240px） */
+    function autoResize() {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 240) + 'px';
+    }
+    autoResize();
+    input.addEventListener('input', autoResize);
+
     input.focus();
-    try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) {}
+    /* 让光标停在文字末尾 */
+    try {
+      input.setSelectionRange(input.value.length, input.value.length);
+    } catch (e) {}
+    /* 滚动到底部，确保看到最后一行 */
+    setTimeout(function () {
+      input.scrollTop = input.scrollHeight;
+      autoResize();
+    }, 0);
 
     let finished = false;
     function finish(commit) {
@@ -317,11 +286,17 @@
       renderTodayList();
     }
 
-    input.addEventListener('keydown', ev => {
-      if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
-      else if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
+    input.addEventListener('keydown', function (ev) {
+      /* Enter 保存，Shift+Enter 换行 */
+      if (ev.key === 'Enter' && !ev.shiftKey) {
+        ev.preventDefault();
+        finish(true);
+      } else if (ev.key === 'Escape') {
+        ev.preventDefault();
+        finish(false);
+      }
     });
-    input.addEventListener('blur', () => finish(true));
+    input.addEventListener('blur', function () { finish(true); });
   }
 
   /* ============ 心情 ============ */
@@ -340,151 +315,6 @@
     $('#moodTip').textContent = day.mood
       ? (MOOD_TIPS[day.mood] || '记录好啦～')
       : '点一下记录心情吧';
-  }
-
-  /* ============ 提醒弹窗 ============ */
-  function openRemindDialog(dateKey, todoId) {
-    const dayRef = store.getDayRef(dateKey);
-    const t = dayRef.todos.find(x => x.id === todoId);
-    if (!t) return;
-
-    remindTarget = { dateKey: dateKey, id: todoId };
-
-    $('#remindTask').textContent = t.text;
-
-    // 默认日期 = 当前查看的日期
-    let defaultDate = dateKey;
-    let defaultTime = '09:00';
-
-    if (t.remind) {
-      const parts = t.remind.split(' ');
-      if (parts.length === 2) {
-        defaultDate = parts[0];
-        defaultTime = parts[1];
-      }
-    } else {
-      // 默认时间：如果今天，就用当前时间 +1 小时；否则用 09:00
-      if (dateKey === App.state.todayKey) {
-        const n = new Date();
-        n.setHours(n.getHours() + 1);
-        defaultTime = pad2(n.getHours()) + ':' + pad2(n.getMinutes());
-      }
-    }
-
-    $('#remindDate').value = defaultDate;
-    $('#remindTime').value = defaultTime;
-
-    $('#remindModal').style.display = 'flex';
-  }
-
-  function closeRemind() {
-    $('#remindModal').style.display = 'none';
-    remindTarget = null;
-  }
-
-  function quickRemind(offsetDays) {
-    if (!remindTarget) return;
-    const base = new Date();
-    base.setDate(base.getDate() + offsetDays);
-    const dateStr = base.getFullYear() + '-' + pad2(base.getMonth() + 1) + '-' + pad2(base.getDate());
-
-    let timeStr = '09:00';
-    if (offsetDays === 0) timeStr = '20:00';
-
-    $('#remindDate').value = dateStr;
-    $('#remindTime').value = timeStr;
-  }
-
-  function saveRemind() {
-    if (!remindTarget) return;
-    const dateVal = $('#remindDate').value;
-    const timeVal = $('#remindTime').value;
-
-    if (!dateVal || !timeVal) {
-      alert('请选择日期和时间');
-      return;
-    }
-
-    const dayRef = store.getDayRef(remindTarget.dateKey);
-    const t = dayRef.todos.find(x => x.id === remindTarget.id);
-    if (!t) { closeRemind(); return; }
-
-    const remindStr = dateVal + ' ' + timeVal;
-    const nowS = nowStr();
-
-    if (remindStr <= nowS) {
-      if (!confirm('设置的时间已经过去了，确定要保存吗？\n（保存后会立即提醒一次）')) {
-        return;
-      }
-    }
-
-    t.remind = remindStr;
-    store.save();
-
-    // 请求通知权限（电脑浏览器和 APK 都尽量申请）
-    if ('Notification' in window && Notification.permission === 'default') {
-      try { Notification.requestPermission(); } catch (e) {}
-    }
-
-    closeRemind();
-    renderTodayList();
-  }
-
-  function clearRemind() {
-    if (!remindTarget) return;
-    const dayRef = store.getDayRef(remindTarget.dateKey);
-    const t = dayRef.todos.find(x => x.id === remindTarget.id);
-    if (t) {
-      t.remind = '';
-      store.save();
-    }
-    closeRemind();
-    renderTodayList();
-  }
-
-  /* ============ 通知触发 ============ */
-  function triggerNotify(title, body) {
-    // HBuilderX APK 环境：使用原生推送
-    if (window.plus && plus.push && plus.push.createMessage) {
-      try {
-        plus.push.createMessage(body, 'LocalMsg', { title: title });
-        return;
-      } catch (e) {}
-    }
-    // 标准浏览器环境
-    if ('Notification' in window && Notification.permission === 'granted') {
-      try {
-        new Notification(title, { body: body, icon: 'icon-192.png' });
-        return;
-      } catch (e) {}
-    }
-    // 兜底：弹窗
-    alert(title + '\n' + body);
-  }
-
-  function checkReminders() {
-    const nowS = nowStr();
-    let changed = false;
-    let triggeredAny = false;
-
-    for (let dateKey in store) {
-      const dayData = store[dateKey];
-      if (!dayData || !Array.isArray(dayData.todos)) continue;
-
-      dayData.todos.forEach(t => {
-        if (t.remind && !t.done && t.remind <= nowS) {
-          triggerNotify('待办提醒 ⏰', '时间到啦，记得完成：' + t.text);
-          t.remind = '';
-          changed = true;
-          triggeredAny = true;
-        }
-      });
-    }
-
-    if (changed) {
-      store.save();
-      if (App.state.day) renderTodayList();
-    }
   }
 
   /* ============ 设置面板 ============ */
@@ -516,7 +346,6 @@
 
   function exportMarkdown(type) {
     let md = '';
-    const T_KEY = App.state.todayKey;
     const key = App.state.selectedDateKey;
 
     if (type === 'day') {
@@ -526,18 +355,19 @@
       md += '## 📝 待办清单\n';
       if (d.todos.length) {
         d.todos.forEach((t, i) => {
-          md += (i + 1) + '. [' + (t.done ? 'x' : ' ') + '] ' + t.text + (t.starred ? ' ⭐' : '') + (t.remind ? ' ⏰' + t.remind : '') + '\n';
+          md += (i + 1) + '. [' + (t.done ? 'x' : ' ') + '] ' + t.text + (t.starred ? ' ⭐' : '') + '\n';
         });
       } else { md += '（无）\n'; }
       md += '\n## 🌈 今日心情\n' + (d.mood || '（无）') + '\n\n';
       md += '## 💭 碎碎念\n' + (d.note || '（无）') + '\n';
     } else {
+      const allData = (store.getAll ? store.getAll() : {}) || {};
       const p = key.split('-');
       const prefix = p[0] + '-' + p[1];
       let total = 0, done = 0, notes = [];
-      for (let k in store) {
+      for (let k in allData) {
         if (k.indexOf(prefix) === 0) {
-          const d = store[k];
+          const d = allData[k];
           if (d.todos && d.todos.length) {
             total += d.todos.length;
             done += d.todos.filter(t => t.done).length;
@@ -568,12 +398,11 @@
     }
   }
 
-  /* ============ AI 月度总结（免费版：GLM-4-Flash） ============ */
+  /* ============ AI 月度总结 ============ */
   function generateAISummary() {
-    const allData = store.getAll();   // ★ 关键：读真实数据
+    const allData = (store.getAll ? store.getAll() : {}) || {};
     const allKeys = Object.keys(allData).sort();
 
-    // 以当前查看的日期所属月份为准
     const p = App.state.selectedDateKey.split('-');
     const prefix = p[0] + '-' + p[1];
 
@@ -583,9 +412,7 @@
     const doneList = [];
     const undoneList = [];
 
-    // 先看本月，如果本月没数据就扫全部
     let scanKeys = allKeys.filter(k => k.indexOf(prefix) === 0);
-
     if (scanKeys.length === 0) {
       scanKeys = allKeys.filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k));
     }
@@ -613,7 +440,6 @@
 
     const rate = total ? Math.round(done / total * 100) : 0;
 
-    // ============ 没配 Key：本地版 ============
     if (!App.config.AI_API_KEY) {
       let topMood = '';
       let maxM = 0;
@@ -639,7 +465,6 @@
       return;
     }
 
-    // ============ 有 Key：真实 AI ============
     $('#outputTitle').textContent = '🤖 AI 正在思考中…';
     $('#outputText').value = '正在把你的记录发给 AI 总结，请稍等几秒…';
     $('#outputModal').style.display = 'flex';
@@ -704,9 +529,6 @@
     renderTodayList();
     renderMoods();
 
-    // 启动提醒轮询（每 30 秒检查一次）
-    setInterval(checkReminders, 30000);
-
     $('#dateStrip').addEventListener('click', e => {
       const chip = e.target.closest('.dchip');
       if (!chip) return;
@@ -742,12 +564,6 @@
         t.starred = !t.starred;
         store.save();
         renderTodayList();
-        return;
-      }
-
-      // 打开提醒弹窗
-      if (e.target.closest('.bell-btn')) {
-        openRemindDialog(App.state.selectedDateKey, t.id);
         return;
       }
 
@@ -814,7 +630,6 @@
     openSettings, closeSettings,
     exportData, importData,
     exportMarkdown, copyOutput,
-    generateAISummary,
-    openRemindDialog, closeRemind, saveRemind, clearRemind, quickRemind
+    generateAISummary
   };
 })(window.App);
