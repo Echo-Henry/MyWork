@@ -9,6 +9,9 @@
   let lastAllDone = false;
   let noteTimer = null;
   let noteEl = null;
+  let remindTarget = null; // { dateKey, id }
+
+  const pad2 = n => String(n).padStart(2, '0');
 
   /* ============ 顶部文案 ============ */
   function greetingByHour() {
@@ -54,7 +57,6 @@
     $('#moodLabel').textContent = '🌈 ' + prefix + '心情';
     $('#noteLabel').textContent = '💭 ' + prefix + '碎碎念';
 
-    // 提示语：只需输入待办事项内容，系统会自动排序
     $('#input').placeholder = '只需输入待办事项内容，系统会自动排序';
 
     $('#quote').textContent = '「 ' + QUOTES[seed % QUOTES.length] + ' 」';
@@ -101,6 +103,40 @@
     noteEl.value = App.state.day.note;
   }
 
+  /* ============ 提醒时间格式化 ============ */
+  function formatRemind(remind) {
+    if (!remind) return '';
+    // remind 格式: 'YYYY-MM-DD HH:MM'
+    const p = remind.split(' ');
+    if (p.length !== 2) return remind;
+    const datePart = p[0];
+    const timePart = p[1];
+    const todayKey = App.state.todayKey;
+    if (datePart === todayKey) {
+      return '今天 ' + timePart;
+    }
+    // 判断是不是明天 / 后天
+    const dp = datePart.split('-');
+    const dDate = new Date(+dp[0], +dp[1] - 1, +dp[2]);
+    const t = new Date();
+    t.setHours(0, 0, 0, 0);
+    const diff = Math.round((dDate - t) / 86400000);
+    if (diff === 1) return '明天 ' + timePart;
+    if (diff === 2) return '后天 ' + timePart;
+    return (dp[1]) + '/' + (dp[2]) + ' ' + timePart;
+  }
+
+  function isOverdue(remind) {
+    if (!remind) return false;
+    return remind < nowStr();
+  }
+
+  function nowStr() {
+    const n = new Date();
+    return n.getFullYear() + '-' + pad2(n.getMonth() + 1) + '-' + pad2(n.getDate())
+      + ' ' + pad2(n.getHours()) + ':' + pad2(n.getMinutes());
+  }
+
   /* ============ 待办列表 ============ */
   function renderTodayList(newestId) {
     const day = App.state.day;
@@ -109,7 +145,6 @@
 
     const isToday = App.state.selectedDateKey === App.state.todayKey;
 
-    // 排序：星标优先，未完成优先
     day.todos.sort((a, b) => {
       if (a.starred !== b.starred) return b.starred - a.starred;
       if (a.done !== b.done) return a.done - b.done;
@@ -124,7 +159,6 @@
       li.className = 'item' + (t.done ? ' done' : '') + (t.id === newestId ? ' new' : '');
       li.dataset.id = t.id;
 
-      // 序号（自动生成）
       const num = document.createElement('span');
       num.className = 'num';
       num.textContent = index + 1;
@@ -144,6 +178,14 @@
       txt.className = 'txt';
       txt.textContent = t.text;
 
+      // 提醒标签
+      let remindTag = null;
+      if (t.remind) {
+        remindTag = document.createElement('span');
+        remindTag.className = 'remind-badge' + (isOverdue(t.remind) ? ' overdue' : '');
+        remindTag.textContent = '⏰ ' + formatRemind(t.remind);
+      }
+
       const tag = document.createElement('span');
       tag.className = 'tag';
       tag.dataset.cat = key;
@@ -154,9 +196,9 @@
       star.innerHTML = t.starred ? '⭐' : '☆';
 
       const bell = document.createElement('span');
-      bell.className = 'bell-btn';
-      bell.innerHTML = '🔔';
-      bell.title = '定时提醒（后续接入）';
+      bell.className = 'bell-btn' + (t.remind ? ' active' : '');
+      bell.innerHTML = t.remind ? '🔔' : '🔕';
+      bell.title = t.remind ? ('提醒时间: ' + t.remind) : '点击设置定时提醒';
 
       const edit = document.createElement('button');
       edit.className = 'edit';
@@ -173,6 +215,7 @@
       li.appendChild(num);
       li.appendChild(check);
       li.appendChild(txt);
+      if (remindTag) li.appendChild(remindTag);
       li.appendChild(tag);
       li.appendChild(star);
       li.appendChild(bell);
@@ -184,18 +227,14 @@
     $('#empty').style.display = day.todos.length ? 'none' : 'block';
     updateProgress();
 
-    // 拖拽排序（仅限今天视图）
     if (isToday && window.Sortable) {
-      if (listEl._sortable) {
-        listEl._sortable.destroy();
-      }
+      if (listEl._sortable) listEl._sortable.destroy();
       listEl._sortable = new Sortable(listEl, {
         animation: 150,
         onEnd: function (evt) {
           const movedItem = day.todos.splice(evt.oldIndex, 1)[0];
           day.todos.splice(evt.newIndex, 0, movedItem);
           store.save();
-          // 只更新序号，避免整列表重绘造成闪烁
           const nums = listEl.querySelectorAll('.num');
           nums.forEach((el, i) => { el.textContent = i + 1; });
         }
@@ -303,14 +342,154 @@
       : '点一下记录心情吧';
   }
 
-  /* ============ 设置面板相关 ============ */
-  function openSettings() {
-    $('#settingsModal').style.display = 'flex';
+  /* ============ 提醒弹窗 ============ */
+  function openRemindDialog(dateKey, todoId) {
+    const dayRef = store.getDayRef(dateKey);
+    const t = dayRef.todos.find(x => x.id === todoId);
+    if (!t) return;
+
+    remindTarget = { dateKey: dateKey, id: todoId };
+
+    $('#remindTask').textContent = t.text;
+
+    // 默认日期 = 当前查看的日期
+    let defaultDate = dateKey;
+    let defaultTime = '09:00';
+
+    if (t.remind) {
+      const parts = t.remind.split(' ');
+      if (parts.length === 2) {
+        defaultDate = parts[0];
+        defaultTime = parts[1];
+      }
+    } else {
+      // 默认时间：如果今天，就用当前时间 +1 小时；否则用 09:00
+      if (dateKey === App.state.todayKey) {
+        const n = new Date();
+        n.setHours(n.getHours() + 1);
+        defaultTime = pad2(n.getHours()) + ':' + pad2(n.getMinutes());
+      }
+    }
+
+    $('#remindDate').value = defaultDate;
+    $('#remindTime').value = defaultTime;
+
+    $('#remindModal').style.display = 'flex';
   }
 
-  function closeSettings() {
-    $('#settingsModal').style.display = 'none';
+  function closeRemind() {
+    $('#remindModal').style.display = 'none';
+    remindTarget = null;
   }
+
+  function quickRemind(offsetDays) {
+    if (!remindTarget) return;
+    const base = new Date();
+    base.setDate(base.getDate() + offsetDays);
+    const dateStr = base.getFullYear() + '-' + pad2(base.getMonth() + 1) + '-' + pad2(base.getDate());
+
+    let timeStr = '09:00';
+    if (offsetDays === 0) timeStr = '20:00';
+
+    $('#remindDate').value = dateStr;
+    $('#remindTime').value = timeStr;
+  }
+
+  function saveRemind() {
+    if (!remindTarget) return;
+    const dateVal = $('#remindDate').value;
+    const timeVal = $('#remindTime').value;
+
+    if (!dateVal || !timeVal) {
+      alert('请选择日期和时间');
+      return;
+    }
+
+    const dayRef = store.getDayRef(remindTarget.dateKey);
+    const t = dayRef.todos.find(x => x.id === remindTarget.id);
+    if (!t) { closeRemind(); return; }
+
+    const remindStr = dateVal + ' ' + timeVal;
+    const nowS = nowStr();
+
+    if (remindStr <= nowS) {
+      if (!confirm('设置的时间已经过去了，确定要保存吗？\n（保存后会立即提醒一次）')) {
+        return;
+      }
+    }
+
+    t.remind = remindStr;
+    store.save();
+
+    // 请求通知权限（电脑浏览器和 APK 都尽量申请）
+    if ('Notification' in window && Notification.permission === 'default') {
+      try { Notification.requestPermission(); } catch (e) {}
+    }
+
+    closeRemind();
+    renderTodayList();
+  }
+
+  function clearRemind() {
+    if (!remindTarget) return;
+    const dayRef = store.getDayRef(remindTarget.dateKey);
+    const t = dayRef.todos.find(x => x.id === remindTarget.id);
+    if (t) {
+      t.remind = '';
+      store.save();
+    }
+    closeRemind();
+    renderTodayList();
+  }
+
+  /* ============ 通知触发 ============ */
+  function triggerNotify(title, body) {
+    // HBuilderX APK 环境：使用原生推送
+    if (window.plus && plus.push && plus.push.createMessage) {
+      try {
+        plus.push.createMessage(body, 'LocalMsg', { title: title });
+        return;
+      } catch (e) {}
+    }
+    // 标准浏览器环境
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification(title, { body: body, icon: 'icon-192.png' });
+        return;
+      } catch (e) {}
+    }
+    // 兜底：弹窗
+    alert(title + '\n' + body);
+  }
+
+  function checkReminders() {
+    const nowS = nowStr();
+    let changed = false;
+    let triggeredAny = false;
+
+    for (let dateKey in store) {
+      const dayData = store[dateKey];
+      if (!dayData || !Array.isArray(dayData.todos)) continue;
+
+      dayData.todos.forEach(t => {
+        if (t.remind && !t.done && t.remind <= nowS) {
+          triggerNotify('待办提醒 ⏰', '时间到啦，记得完成：' + t.text);
+          t.remind = '';
+          changed = true;
+          triggeredAny = true;
+        }
+      });
+    }
+
+    if (changed) {
+      store.save();
+      if (App.state.day) renderTodayList();
+    }
+  }
+
+  /* ============ 设置面板 ============ */
+  function openSettings() { $('#settingsModal').style.display = 'flex'; }
+  function closeSettings() { $('#settingsModal').style.display = 'none'; }
 
   function exportData() {
     const password = prompt('请设置导出密码（用于换机导入）：');
@@ -335,11 +514,184 @@
     });
   }
 
+  function exportMarkdown(type) {
+    let md = '';
+    const T_KEY = App.state.todayKey;
+    const key = App.state.selectedDateKey;
+
+    if (type === 'day') {
+      const d = store.readDay(key);
+      const p = key.split('-');
+      md += '# 好好生活 · ' + p[0] + '年' + (+p[1]) + '月' + (+p[2]) + '日\n\n';
+      md += '## 📝 待办清单\n';
+      if (d.todos.length) {
+        d.todos.forEach((t, i) => {
+          md += (i + 1) + '. [' + (t.done ? 'x' : ' ') + '] ' + t.text + (t.starred ? ' ⭐' : '') + (t.remind ? ' ⏰' + t.remind : '') + '\n';
+        });
+      } else { md += '（无）\n'; }
+      md += '\n## 🌈 今日心情\n' + (d.mood || '（无）') + '\n\n';
+      md += '## 💭 碎碎念\n' + (d.note || '（无）') + '\n';
+    } else {
+      const p = key.split('-');
+      const prefix = p[0] + '-' + p[1];
+      let total = 0, done = 0, notes = [];
+      for (let k in store) {
+        if (k.indexOf(prefix) === 0) {
+          const d = store[k];
+          if (d.todos && d.todos.length) {
+            total += d.todos.length;
+            done += d.todos.filter(t => t.done).length;
+          }
+          if (d.note && d.note.trim()) {
+            notes.push('**' + k + '**: ' + d.note);
+          }
+        }
+      }
+      md = '# 好好生活 · ' + p[0] + '年' + (+p[1]) + '月 总结\n\n';
+      md += '## 📊 总体完成度：' + done + '/' + total + '\n\n';
+      md += '## 💭 本月碎碎念精选\n' + (notes.length ? notes.join('\n\n') : '（无）') + '\n';
+    }
+
+    $('#outputTitle').textContent = type === 'day' ? '📝 今日明文导出' : '📅 当月明文导出';
+    $('#outputText').value = md;
+    $('#outputModal').style.display = 'flex';
+  }
+
+  function copyOutput() {
+    const textarea = $('#outputText');
+    textarea.select();
+    try {
+      document.execCommand('copy');
+      alert('已复制到剪贴板！可以粘贴到其他笔记软件里了。');
+    } catch (e) {
+      alert('复制失败，请长按文本框手动复制。');
+    }
+  }
+
+  /* ============ AI 月度总结（免费版：GLM-4-Flash） ============ */
   function generateAISummary() {
+    const allData = store.getAll();   // ★ 关键：读真实数据
+    const allKeys = Object.keys(allData).sort();
+
+    // 以当前查看的日期所属月份为准
+    const p = App.state.selectedDateKey.split('-');
+    const prefix = p[0] + '-' + p[1];
+
+    let total = 0, done = 0;
+    const notes = [];
+    const moodCount = {};
+    const doneList = [];
+    const undoneList = [];
+
+    // 先看本月，如果本月没数据就扫全部
+    let scanKeys = allKeys.filter(k => k.indexOf(prefix) === 0);
+
+    if (scanKeys.length === 0) {
+      scanKeys = allKeys.filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k));
+    }
+
+    scanKeys.forEach(k => {
+      const d = allData[k];
+      if (!d || typeof d !== 'object') return;
+      const dp = k.split('-');
+      const dayLabel = (+dp[1]) + '月' + (+dp[2]) + '日';
+
+      if (Array.isArray(d.todos) && d.todos.length) {
+        total += d.todos.length;
+        d.todos.forEach(t => {
+          if (t.done) {
+            done++;
+            doneList.push('· ' + dayLabel + '：' + t.text);
+          } else {
+            undoneList.push('· ' + dayLabel + '：' + t.text);
+          }
+        });
+      }
+      if (d.mood) moodCount[d.mood] = (moodCount[d.mood] || 0) + 1;
+      if (d.note && d.note.trim()) notes.push(d.note.trim());
+    });
+
+    const rate = total ? Math.round(done / total * 100) : 0;
+
+    // ============ 没配 Key：本地版 ============
     if (!App.config.AI_API_KEY) {
-      alert('AI总结功能需要先在 config.js 中配置 API Key。\n目前可以先把你的碎碎念复制到 AI 对话框里试试～');
+      let topMood = '';
+      let maxM = 0;
+      for (let m in moodCount) {
+        if (moodCount[m] > maxM) { maxM = moodCount[m]; topMood = m; }
+      }
+      const moodText = topMood ? '你最常记录的心情是 ' + topMood : '你还没有记录心情';
+      const noteText = notes.length ? '碎碎念里你写过：“' + notes[0].substring(0, 30) + '...”' : '这个月没有写碎碎念哦';
+
+      const doneText = doneList.length
+        ? doneList.slice(0, 30).join('\n') + (doneList.length > 30 ? '\n· …等共 ' + doneList.length + ' 件' : '')
+        : '（本月没有完成的待办）';
+
+      const localText = '✨ 好好生活 · 本月总结 ✨\n\n' +
+        '📊 本月记录 ' + total + ' 件待办，完成 ' + done + ' 件，完成率 ' + rate + '%。\n\n' +
+        '✅ 你完成的事：\n' + doneText + '\n\n' +
+        moodText + '。\n\n' + noteText + '\n\n' +
+        '数据全部保存在你的手机本地，没有上传到任何服务器。\n下个月也要继续好好生活呀！🌸';
+
+      $('#outputTitle').textContent = '🤖 AI 月度总结（本地版）';
+      $('#outputText').value = localText;
+      $('#outputModal').style.display = 'flex';
       return;
     }
+
+    // ============ 有 Key：真实 AI ============
+    $('#outputTitle').textContent = '🤖 AI 正在思考中…';
+    $('#outputText').value = '正在把你的记录发给 AI 总结，请稍等几秒…';
+    $('#outputModal').style.display = 'flex';
+
+    const doneForAI = doneList.length ? doneList.join('\n') : '（无）';
+    const undoneForAI = undoneList.length ? undoneList.join('\n') : '（无）';
+    const notesForAI = notes.length ? notes.join(' | ') : '（无）';
+
+    const prompt = '你是一位温柔、鼓励式的月度总结助理。请根据下面的真实数据，写一段月度总结。\n\n' +
+      '【要求】\n' +
+      '1. 必须包含一个"✅ 本月你完成了"的部分，用列表形式逐条列出用户完成的待办事项（保留日期）。\n' +
+      '2. 如果完成的事项太多，就挑选有代表性的 10-15 条列出。\n' +
+      '3. 后面写一段温暖的鼓励语，150 字以内。\n' +
+      '4. 不要编造数据，不要提"AI"这个词。\n' +
+      '5. 语气温柔、像朋友在替你回顾这个月。\n\n' +
+      '【本月完成情况】\n' +
+      '共记录 ' + total + ' 件待办，完成 ' + done + ' 件，完成率 ' + rate + '%。\n\n' +
+      '【已完成的待办】\n' + doneForAI + '\n\n' +
+      '【未完成的待办】\n' + undoneForAI + '\n\n' +
+      '【心情记录】' + JSON.stringify(moodCount) + '\n\n' +
+      '【碎碎念】\n' + notesForAI;
+
+    fetch(App.config.AI_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + App.config.AI_API_KEY
+      },
+      body: JSON.stringify({
+        model: 'glm-4-flash',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        let aiText = '';
+        if (data.choices && data.choices[0] && data.choices[0].message) {
+          aiText = data.choices[0].message.content;
+        } else if (data.error) {
+          aiText = 'AI 返回错误：' + (data.error.message || JSON.stringify(data.error));
+        } else {
+          aiText = 'AI 返回格式异常：' + JSON.stringify(data);
+        }
+        $('#outputText').value = aiText;
+        $('#outputTitle').textContent = '🤖 AI 月度总结（GLM-4-Flash）';
+      })
+      .catch(err => {
+        $('#outputText').value = '调用 AI 失败：' + err.message +
+          '\n\n请检查：\n1. 手机/电脑是否联网\n2. config.js 里的 API Key 是否填写正确';
+        $('#outputTitle').textContent = '⚠️ AI 调用失败';
+      });
   }
 
   /* ============ 初始化 ============ */
@@ -351,6 +703,9 @@
     buildStrip();
     renderTodayList();
     renderMoods();
+
+    // 启动提醒轮询（每 30 秒检查一次）
+    setInterval(checkReminders, 30000);
 
     $('#dateStrip').addEventListener('click', e => {
       const chip = e.target.closest('.dchip');
@@ -390,8 +745,9 @@
         return;
       }
 
+      // 打开提醒弹窗
       if (e.target.closest('.bell-btn')) {
-        alert('定时提醒功能即将上线，敬请期待！');
+        openRemindDialog(App.state.selectedDateKey, t.id);
         return;
       }
 
@@ -453,5 +809,12 @@
     noteEl.value = App.state.day.note;
   }
 
-  App.today = { init, refresh, switchDate, openSettings, closeSettings, exportData, importData, generateAISummary };
+  App.today = {
+    init, refresh, switchDate,
+    openSettings, closeSettings,
+    exportData, importData,
+    exportMarkdown, copyOutput,
+    generateAISummary,
+    openRemindDialog, closeRemind, saveRemind, clearRemind, quickRemind
+  };
 })(window.App);

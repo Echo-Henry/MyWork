@@ -44,13 +44,14 @@
     return false;
   }
 
-  /* =========================================================
-     加密导出
-     关键修复：btoa 不支持中文，先用 encodeURIComponent 把中文转成 ASCII
-     ========================================================= */
+  /* ★ 新增：暴露真实数据，给 AI 总结和导出用 */
+  function getAll() {
+    return store;
+  }
+
   function exportData(password) {
     const dataStr = JSON.stringify(store);
-    const utf8Str = encodeURIComponent(dataStr); // 中文 → ASCII
+    const utf8Str = encodeURIComponent(dataStr);
     let encrypted = '';
     for (let i = 0; i < utf8Str.length; i++) {
       encrypted += String.fromCharCode(
@@ -75,9 +76,6 @@
     return fileName;
   }
 
-  /* =========================================================
-     解密导入
-     ========================================================= */
   function importData(file, password) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -109,5 +107,5 @@
     });
   }
 
-  App.store = { save, readDay, getDayRef, hasData, exportData, importData };
+  App.store = { save, readDay, getDayRef, hasData, getAll, exportData, importData };
 })(window.App);

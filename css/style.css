@@ -102,20 +102,7 @@ body{
 .item.new{animation:slideIn .32s cubic-bezier(.2,.9,.3,1.3)}
 @keyframes slideIn{from{opacity:0;transform:translateY(-10px) scale(.97)}to{opacity:1;transform:none}}
 
-/* 序号 */
-.num{
-  flex:0 0 auto;
-  min-width:22px;height:22px;
-  display:inline-flex;align-items:center;justify-content:center;
-  font-size:11.5px;font-weight:800;
-  color:var(--text-2);
-  background:#FFF3F7;
-  border-radius:7px;
-  padding:0 5px;
-  font-family:inherit;
-  letter-spacing:-.3px;
-  transition:all .2s;
-}
+.num{flex:0 0 auto;min-width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:800;color:var(--text-2);background:#FFF3F7;border-radius:7px;padding:0 5px;font-family:inherit;letter-spacing:-.3px;transition:all .2s}
 .item.done .num{color:#CDBFC4;background:#F8F2F4}
 .item:hover .num{background:#FFE8EE;color:var(--pink)}
 
@@ -139,6 +126,7 @@ body{
 .star-btn, .bell-btn { flex: 0 0 auto; padding: 0 4px; cursor: pointer; user-select: none; transition: transform 0.2s; font-size: 15px; }
 .star-btn:hover, .bell-btn:hover { transform: scale(1.2); }
 .bell-btn { opacity: 0.35; font-size: 13px; }
+.bell-btn.active { opacity: 1; filter: drop-shadow(0 0 4px #7BA6E8); font-size: 14px; }
 .star-btn.active { filter: drop-shadow(0 0 4px #FF7A9C); }
 
 .edit, .del{opacity:0;border:none;background:transparent;color:#DCCBD1;font-size:15px;cursor:pointer;padding:4px 7px;border-radius:10px;font-family:inherit;line-height:1;transition:all .2s;flex:0 0 auto}
@@ -221,8 +209,8 @@ body{
 .confetti{position:fixed;top:-40px;z-index:99;pointer-events:none;animation:fall 2.4s ease-in forwards}
 @keyframes fall{to{transform:translateY(108vh) rotate(420deg);opacity:0}}
 
-.modal{position:fixed;inset:0;background:rgba(62,52,55,0.6);z-index:100;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
-.modal-content{background:#fff;width:90%;max-width:420px;border-radius:26px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.15);animation:modalIn 0.3s cubic-bezier(0.2,0.9,0.3,1.2)}
+.modal{position:fixed;inset:0;background:rgba(62,52,55,0.6);z-index:100;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:16px}
+.modal-content{background:#fff;width:100%;max-width:420px;border-radius:26px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.15);animation:modalIn 0.3s cubic-bezier(0.2,0.9,0.3,1.2);max-height:88vh;overflow-y:auto}
 @keyframes modalIn{from{opacity:0;transform:scale(0.9)}to{opacity:1;transform:scale(1)}}
 .modal-content h2{font-size:20px;font-weight:800;margin-bottom:20px}
 .setting-item{margin-bottom:24px;border-bottom:1px dashed var(--line);padding-bottom:16px}
@@ -233,6 +221,79 @@ body{
 .btn:active{transform:scale(.975)}
 .btn.ghost{background:#fff;color:var(--pink);border:1.5px solid var(--pink-soft)}
 .btn.danger{background:#FFE8EE;color:#E05A7C}
+
+/* ============ 提醒弹窗 ============ */
+.remind-task{
+  font-size:13.5px;color:var(--text-2);
+  background:#FFFBFB;border-radius:12px;
+  padding:10px 14px;margin-bottom:18px;
+  line-height:1.5;word-break:break-word;
+  border-left:3px solid var(--pink-2);
+}
+.remind-task::before{content:'📌 ';}
+
+.remind-field{margin-bottom:14px}
+.remind-field label{
+  display:block;font-size:13px;font-weight:700;
+  color:var(--text-2);margin-bottom:7px;letter-spacing:.3px;
+}
+.remind-field input[type="date"],
+.remind-field input[type="time"]{
+  width:100%;
+  border:1.5px solid var(--line);
+  background:#FFFBFB;
+  border-radius:13px;
+  padding:11px 14px;
+  font-size:15px;
+  font-family:inherit;
+  color:var(--text);
+  outline:none;
+  transition:all .22s;
+  -webkit-appearance:none;
+  appearance:none;
+}
+.remind-field input:focus{
+  border-color:var(--pink-2);
+  background:#fff;
+  box-shadow:0 0 0 4px rgba(255,122,156,.1);
+}
+
+.remind-quick{
+  display:flex;gap:8px;flex-wrap:wrap;
+  margin:14px 0 12px;
+}
+.remind-quick .chip{
+  border:1.5px solid var(--line);
+  background:#fff;
+  color:var(--text-2);
+  font-size:12.5px;font-weight:600;
+  padding:7px 13px;border-radius:999px;
+  cursor:pointer;font-family:inherit;
+  transition:all .2s;white-space:nowrap;
+}
+.remind-quick .chip:hover{
+  border-color:var(--pink-2);
+  color:var(--pink);
+  background:#FFF8FA;
+}
+.remind-quick .chip:active{transform:scale(.96)}
+
+.remind-tip{
+  font-size:11.5px;color:#C4B4BA;
+  line-height:1.65;margin:4px 0 6px;
+  padding:8px 12px;background:#FFF9F5;
+  border-radius:10px;
+}
+
+/* 待办列表里提醒时间的展示 */
+.remind-badge{
+  font-size:10px;font-weight:800;
+  background:#EAF2FF;color:#6C93E0;
+  padding:2px 7px;border-radius:999px;
+  letter-spacing:.2px;
+  flex:0 0 auto;white-space:nowrap;
+}
+.remind-badge.overdue{background:#FFE8EE;color:#E05A7C;}
 
 @media (max-width:780px){
   .grid{grid-template-columns:1fr;gap:16px;margin-top:18px}
@@ -272,6 +333,7 @@ body{
   .txt{font-size:14.5px}
   .edit-input{font-size:14.5px;padding:7px 10px;border-radius:11px}
   .tag{font-size:10px;padding:2px 7px}
+  .remind-badge{font-size:9.5px;padding:2px 6px}
   .edit,.del{font-size:14px;padding:5px 6px}
   .moods{gap:6px;margin-top:12px}
   .mood{font-size:20px;border-radius:14px}

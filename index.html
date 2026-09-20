@@ -65,7 +65,7 @@
         </div>
 
         <div class="add-row">
-          <input id="input" type="text" placeholder="今天想完成什么呢～" maxlength="60" autocomplete="off">
+          <input id="input" type="text" placeholder="只需输入待办事项内容，系统会自动排序" maxlength="60" autocomplete="off">
           <button id="addBtn" class="add-btn" aria-label="添加">＋</button>
         </div>
 
@@ -147,14 +147,61 @@
     </div>
 
     <div class="setting-item">
+      <h3>📄 明文导出</h3>
+      <p class="desc">导出为 Markdown 格式，方便阅读或复制到其他笔记软件。</p>
+      <button class="btn ghost" onclick="App.today.exportMarkdown('day')">📝 导出今日明文</button>
+      <button class="btn ghost" onclick="App.today.exportMarkdown('month')">📅 导出当月明文</button>
+    </div>
+
+    <div class="setting-item">
       <h3>🤖 AI 月度总结</h3>
-      <p class="desc">基于本地数据，月底生成专属总结，数据不上传。</p>
+      <p class="desc">基于本地数据，月底生成专属总结，数据不上传。当前为本地模拟版。</p>
       <button class="btn" onclick="App.today.generateAISummary()">✨ 生成本月总结</button>
     </div>
 
     <div class="setting-item" style="border:none;">
       <button class="btn danger" onclick="App.today.closeSettings()">关闭</button>
     </div>
+  </div>
+</div>
+
+<!-- 提醒设置弹窗 -->
+<div id="remindModal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <h2>⏰ 设置提醒</h2>
+    <div class="remind-task" id="remindTask">—</div>
+
+    <div class="remind-field">
+      <label>📅 日期</label>
+      <input type="date" id="remindDate">
+    </div>
+
+    <div class="remind-field">
+      <label>🕐 时间</label>
+      <input type="time" id="remindTime">
+    </div>
+
+    <div class="remind-quick">
+      <button class="chip" onclick="App.today.quickRemind(0)">今晚 20:00</button>
+      <button class="chip" onclick="App.today.quickRemind(1)">明早 09:00</button>
+      <button class="chip" onclick="App.today.quickRemind(2)">后天 09:00</button>
+    </div>
+
+    <p class="remind-tip">💡 到点后会弹出通知，请保持应用在后台运行或打开状态</p>
+
+    <button class="btn" onclick="App.today.saveRemind()">✅ 保存提醒</button>
+    <button class="btn ghost" onclick="App.today.clearRemind()">🗑️ 清除提醒</button>
+    <button class="btn danger" onclick="App.today.closeRemind()">取消</button>
+  </div>
+</div>
+
+<!-- 文本输出弹窗 -->
+<div id="outputModal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <h2 id="outputTitle">📄 数据导出</h2>
+    <textarea id="outputText" readonly style="width:100%;height:200px;border:1.5px solid var(--line);border-radius:12px;padding:10px;font-size:13px;line-height:1.7;resize:none;margin-bottom:12px;background:#FFFBFB;font-family:inherit;color:var(--text);"></textarea>
+    <button class="btn" onclick="App.today.copyOutput()">📋 复制内容</button>
+    <button class="btn ghost" onclick="document.getElementById('outputModal').style.display='none'">关闭</button>
   </div>
 </div>
 
