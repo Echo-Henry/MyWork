@@ -25,6 +25,11 @@
     let d = store[key];
     if (!d || typeof d !== 'object') { d = {}; store[key] = d; }
     if (!Array.isArray(d.todos)) d.todos = [];
+    d.todos.forEach(t => {
+      if (typeof t.starred !== 'boolean') t.starred = false;
+      if (typeof t.done !== 'boolean') t.done = false;
+      if (typeof t.remind !== 'string') t.remind = '';
+    });
     if (typeof d.mood !== 'string') d.mood = '';
     if (typeof d.note !== 'string') d.note = '';
     return d;
@@ -39,5 +44,70 @@
     return false;
   }
 
-  App.store = { save, readDay, getDayRef, hasData };
+  /* =========================================================
+     加密导出
+     关键修复：btoa 不支持中文，先用 encodeURIComponent 把中文转成 ASCII
+     ========================================================= */
+  function exportData(password) {
+    const dataStr = JSON.stringify(store);
+    const utf8Str = encodeURIComponent(dataStr); // 中文 → ASCII
+    let encrypted = '';
+    for (let i = 0; i < utf8Str.length; i++) {
+      encrypted += String.fromCharCode(
+        utf8Str.charCodeAt(i) ^ password.charCodeAt(i % password.length)
+      );
+    }
+    const base64 = btoa(encrypted);
+
+    const fileName = '好好生活数据备份_' + App.state.todayKey + '.workbench';
+    const blob = new Blob([base64], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+    return fileName;
+  }
+
+  /* =========================================================
+     解密导入
+     ========================================================= */
+  function importData(file, password) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        try {
+          const base64 = String(e.target.result).trim();
+          const encrypted = atob(base64);
+          let decrypted = '';
+          for (let i = 0; i < encrypted.length; i++) {
+            decrypted += String.fromCharCode(
+              encrypted.charCodeAt(i) ^ password.charCodeAt(i % password.length)
+            );
+          }
+          const dataStr = decodeURIComponent(decrypted);
+          const importedStore = JSON.parse(dataStr);
+          if (importedStore && typeof importedStore === 'object') {
+            Object.assign(store, importedStore);
+            save();
+            resolve(true);
+          } else {
+            reject(new Error('数据格式不正确'));
+          }
+        } catch (err) {
+          reject(new Error('密码错误或文件损坏'));
+        }
+      };
+      reader.onerror = () => reject(new Error('文件读取失败'));
+      reader.readAsText(file);
+    });
+  }
+
+  App.store = { save, readDay, getDayRef, hasData, exportData, importData };
 })(window.App);

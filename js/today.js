@@ -32,7 +32,6 @@
     const md = mm + '月' + dd + '日';
 
     $('#dateText').textContent = md + ' 星期' + WEEK_CN[dObj.getDay()];
-
     const seed = key.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
     $('#yiText').textContent = YIS[seed % YIS.length];
 
@@ -55,8 +54,8 @@
     $('#moodLabel').textContent = '🌈 ' + prefix + '心情';
     $('#noteLabel').textContent = '💭 ' + prefix + '碎碎念';
 
-    $('#input').placeholder = isT ? '今天想完成什么呢～'
-      : (diff === 1 ? '明天想完成什么呢～' : (diff === 2 ? '后天想完成什么呢～' : '想完成什么呢～'));
+    // 提示语：只需输入待办事项内容，系统会自动排序
+    $('#input').placeholder = '只需输入待办事项内容，系统会自动排序';
 
     $('#quote').textContent = '「 ' + QUOTES[seed % QUOTES.length] + ' 」';
   }
@@ -66,17 +65,10 @@
     const strip = $('#dateStrip');
     strip.innerHTML = '';
     const base = new Date();
-
     for (let i = 0; i < 7; i++) {
       const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
       const key = makeKey(d.getFullYear(), d.getMonth() + 1, d.getDate());
-
-      let w;
-      if (i === 0) w = '今天';
-      else if (i === 1) w = '明天';
-      else if (i === 2) w = '后天';
-      else w = '周' + WEEK_CN[d.getDay()];
-
+      let w = (i === 0) ? '今天' : (i === 1) ? '明天' : (i === 2) ? '后天' : '周' + WEEK_CN[d.getDay()];
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = 'dchip' + (key === App.state.selectedDateKey ? ' active' : '');
@@ -94,7 +86,6 @@
   /* ============ 切换日期 ============ */
   function switchDate(key) {
     if (key === App.state.selectedDateKey) return;
-
     if (noteTimer) { clearTimeout(noteTimer); noteTimer = null; }
     App.state.day.note = noteEl.value;
     store.save();
@@ -116,7 +107,16 @@
     const listEl = $('#list');
     listEl.innerHTML = '';
 
-    day.todos.forEach(t => {
+    const isToday = App.state.selectedDateKey === App.state.todayKey;
+
+    // 排序：星标优先，未完成优先
+    day.todos.sort((a, b) => {
+      if (a.starred !== b.starred) return b.starred - a.starred;
+      if (a.done !== b.done) return a.done - b.done;
+      return 0;
+    });
+
+    day.todos.forEach((t, index) => {
       const key = CATS[t.cat] ? t.cat : 'other';
       const cat = CATS[key];
 
@@ -124,10 +124,21 @@
       li.className = 'item' + (t.done ? ' done' : '') + (t.id === newestId ? ' new' : '');
       li.dataset.id = t.id;
 
+      // 序号（自动生成）
+      const num = document.createElement('span');
+      num.className = 'num';
+      num.textContent = index + 1;
+
       const check = document.createElement('div');
       check.className = 'check';
       check.setAttribute('role', 'checkbox');
       check.setAttribute('aria-checked', t.done ? 'true' : 'false');
+
+      if (!isToday) {
+        check.style.opacity = '0.4';
+        check.style.cursor = 'not-allowed';
+        check.title = '只能完成当天的事项';
+      }
 
       const txt = document.createElement('span');
       txt.className = 'txt';
@@ -138,23 +149,33 @@
       tag.dataset.cat = key;
       tag.textContent = cat.emoji + ' ' + cat.name;
 
+      const star = document.createElement('span');
+      star.className = 'star-btn' + (t.starred ? ' active' : '');
+      star.innerHTML = t.starred ? '⭐' : '☆';
+
+      const bell = document.createElement('span');
+      bell.className = 'bell-btn';
+      bell.innerHTML = '🔔';
+      bell.title = '定时提醒（后续接入）';
+
       const edit = document.createElement('button');
       edit.className = 'edit';
       edit.type = 'button';
       edit.title = '修改';
-      edit.setAttribute('aria-label', '修改');
       edit.textContent = '✎';
 
       const del = document.createElement('button');
       del.className = 'del';
       del.type = 'button';
       del.title = '删除';
-      del.setAttribute('aria-label', '删除');
       del.textContent = '✕';
 
+      li.appendChild(num);
       li.appendChild(check);
       li.appendChild(txt);
       li.appendChild(tag);
+      li.appendChild(star);
+      li.appendChild(bell);
       li.appendChild(edit);
       li.appendChild(del);
       listEl.appendChild(li);
@@ -162,6 +183,24 @@
 
     $('#empty').style.display = day.todos.length ? 'none' : 'block';
     updateProgress();
+
+    // 拖拽排序（仅限今天视图）
+    if (isToday && window.Sortable) {
+      if (listEl._sortable) {
+        listEl._sortable.destroy();
+      }
+      listEl._sortable = new Sortable(listEl, {
+        animation: 150,
+        onEnd: function (evt) {
+          const movedItem = day.todos.splice(evt.oldIndex, 1)[0];
+          day.todos.splice(evt.newIndex, 0, movedItem);
+          store.save();
+          // 只更新序号，避免整列表重绘造成闪烁
+          const nums = listEl.querySelectorAll('.num');
+          nums.forEach((el, i) => { el.textContent = i + 1; });
+        }
+      });
+    }
   }
 
   /* ============ 进度 ============ */
@@ -197,13 +236,12 @@
 
   /* ============ 添加 ============ */
   function addTodo() {
-    const day = App.state.day;
     const input = $('#input');
     const text = input.value.trim();
     if (!text) { input.focus(); return; }
 
-    const item = { id: uid(), text: text, cat: curCat, done: false };
-    day.todos.push(item);
+    const item = { id: uid(), text: text, cat: curCat, done: false, starred: false, remind: '' };
+    App.state.day.todos.push(item);
     input.value = '';
     store.save();
     renderTodayList(item.id);
@@ -223,7 +261,6 @@
     input.className = 'edit-input';
     input.value = t.text;
     input.maxLength = 60;
-    input.setAttribute('aria-label', '修改待办');
 
     li.replaceChild(input, txt);
     input.focus();
@@ -259,12 +296,50 @@
       b.className = 'mood' + (day.mood === m ? ' active' : '');
       b.dataset.mood = m;
       b.textContent = m;
-      b.setAttribute('aria-label', '心情 ' + m);
       box.appendChild(b);
     });
     $('#moodTip').textContent = day.mood
       ? (MOOD_TIPS[day.mood] || '记录好啦～')
       : '点一下记录心情吧';
+  }
+
+  /* ============ 设置面板相关 ============ */
+  function openSettings() {
+    $('#settingsModal').style.display = 'flex';
+  }
+
+  function closeSettings() {
+    $('#settingsModal').style.display = 'none';
+  }
+
+  function exportData() {
+    const password = prompt('请设置导出密码（用于换机导入）：');
+    if (!password) return;
+    try {
+      const fileName = store.exportData(password);
+      alert('导出成功！\n文件名：' + fileName + '\n请到浏览器的“下载”里查看。');
+    } catch (e) {
+      alert('导出失败，请重试。\n' + (e && e.message ? e.message : ''));
+    }
+  }
+
+  function importData(file) {
+    if (!file) return;
+    const password = prompt('请输入导入密码：');
+    if (!password) return;
+    store.importData(file, password).then(() => {
+      alert('数据导入成功！页面即将刷新。');
+      location.reload();
+    }).catch(err => {
+      alert(err.message || '导入失败，密码错误或文件损坏。');
+    });
+  }
+
+  function generateAISummary() {
+    if (!App.config.AI_API_KEY) {
+      alert('AI总结功能需要先在 config.js 中配置 API Key。\n目前可以先把你的碎碎念复制到 AI 对话框里试试～');
+      return;
+    }
   }
 
   /* ============ 初始化 ============ */
@@ -277,20 +352,17 @@
     renderTodayList();
     renderMoods();
 
-    /* 日期条点击 */
     $('#dateStrip').addEventListener('click', e => {
       const chip = e.target.closest('.dchip');
       if (!chip) return;
       switchDate(chip.dataset.key);
     });
 
-    /* 添加按钮 */
     $('#addBtn').addEventListener('click', addTodo);
     $('#input').addEventListener('keydown', e => {
       if (e.key === 'Enter') { e.preventDefault(); addTodo(); }
     });
 
-    /* 列表交互 */
     $('#list').addEventListener('click', e => {
       const li = e.target.closest('.item');
       if (!li) return;
@@ -311,8 +383,24 @@
         return;
       }
 
+      if (e.target.closest('.star-btn')) {
+        t.starred = !t.starred;
+        store.save();
+        renderTodayList();
+        return;
+      }
+
+      if (e.target.closest('.bell-btn')) {
+        alert('定时提醒功能即将上线，敬请期待！');
+        return;
+      }
+
       if (e.target.closest('.check') || e.target.closest('.txt')) {
         if (li.dataset.editing) return;
+        if (App.state.selectedDateKey !== App.state.todayKey) {
+          alert('只能完成当天的事项哦～');
+          return;
+        }
         t.done = !t.done;
         store.save();
         li.classList.toggle('done', t.done);
@@ -330,7 +418,6 @@
       c.click();
     });
 
-    /* 分类切换 */
     $('#cats').addEventListener('click', e => {
       const btn = e.target.closest('.cat');
       if (!btn) return;
@@ -338,7 +425,6 @@
       $$('.cat').forEach(b => b.classList.toggle('active', b === btn));
     });
 
-    /* 心情点击 */
     $('#moods').addEventListener('click', e => {
       const b = e.target.closest('.mood');
       if (!b) return;
@@ -349,7 +435,6 @@
       renderMoods();
     });
 
-    /* 碎碎念 */
     noteEl.addEventListener('input', () => {
       clearTimeout(noteTimer);
       noteTimer = setTimeout(() => {
@@ -368,5 +453,5 @@
     noteEl.value = App.state.day.note;
   }
 
-  App.today = { init, refresh, switchDate };
+  App.today = { init, refresh, switchDate, openSettings, closeSettings, exportData, importData, generateAISummary };
 })(window.App);
