@@ -116,6 +116,8 @@
       return 0;
     });
 
+    const frag = document.createDocumentFragment();
+
     day.todos.forEach((t, index) => {
       const key = CATS[t.cat] ? t.cat : 'other';
       const cat = CATS[key];
@@ -171,16 +173,31 @@
       li.appendChild(star);
       li.appendChild(edit);
       li.appendChild(del);
-      listEl.appendChild(li);
+      frag.appendChild(li);
     });
+
+    listEl.appendChild(frag);
 
     $('#empty').style.display = day.todos.length ? 'none' : 'block';
     updateProgress();
 
+    /* ★ Sortable：长按 400ms 才启动拖拽，按钮上的操作完全不干扰 */
     if (isToday && window.Sortable) {
-      if (listEl._sortable) listEl._sortable.destroy();
+      if (listEl._sortable) {
+        listEl._sortable.destroy();
+        listEl._sortable = null;
+      }
       listEl._sortable = new Sortable(listEl, {
-        animation: 150,
+        animation: 180,
+        delay: 400,                    /* 手机：长按 400ms 才触发拖拽 */
+        delayOnTouchOnly: true,        /* 只在触屏触发长按，鼠标上直接拖 */
+        touchStartThreshold: 12,       /* 手指移动超 12px 视为滑动，不算拖拽 */
+        fallbackTolerance: 12,
+        filter: '.check, .edit, .del, .star-btn, .edit-input, .tag',
+        preventOnFilter: false,        /* 按钮上的点击事件继续生效 */
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        dragClass: 'sortable-drag',
         onEnd: function (evt) {
           const movedItem = day.todos.splice(evt.oldIndex, 1)[0];
           day.todos.splice(evt.newIndex, 0, movedItem);
@@ -245,7 +262,6 @@
     const txt = li.querySelector('.txt');
     if (!txt) return;
 
-    /* ★ 用 textarea 代替 input，自动撑高，能看到全部内容 */
     const input = document.createElement('textarea');
     input.className = 'edit-input';
     input.value = t.text;
@@ -255,7 +271,6 @@
 
     li.replaceChild(input, txt);
 
-    /* 自动调整高度：内容多高，框就多高（最多 240px） */
     function autoResize() {
       input.style.height = 'auto';
       input.style.height = Math.min(input.scrollHeight, 240) + 'px';
@@ -264,11 +279,9 @@
     input.addEventListener('input', autoResize);
 
     input.focus();
-    /* 让光标停在文字末尾 */
     try {
       input.setSelectionRange(input.value.length, input.value.length);
     } catch (e) {}
-    /* 滚动到底部，确保看到最后一行 */
     setTimeout(function () {
       input.scrollTop = input.scrollHeight;
       autoResize();
@@ -287,7 +300,6 @@
     }
 
     input.addEventListener('keydown', function (ev) {
-      /* Enter 保存，Shift+Enter 换行 */
       if (ev.key === 'Enter' && !ev.shiftKey) {
         ev.preventDefault();
         finish(true);
@@ -304,14 +316,16 @@
     const day = App.state.day;
     const box = $('#moods');
     box.innerHTML = '';
+    const frag = document.createDocumentFragment();
     MOODS.forEach(m => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'mood' + (day.mood === m ? ' active' : '');
       b.dataset.mood = m;
       b.textContent = m;
-      box.appendChild(b);
+      frag.appendChild(b);
     });
+    box.appendChild(frag);
     $('#moodTip').textContent = day.mood
       ? (MOOD_TIPS[day.mood] || '记录好啦～')
       : '点一下记录心情吧';
@@ -540,14 +554,18 @@
       if (e.key === 'Enter') { e.preventDefault(); addTodo(); }
     });
 
-    $('#list').addEventListener('click', e => {
+    /* ★ 用 pointerup 处理点击，比 click 更快更稳 */
+    $('#list').addEventListener('pointerup', e => {
+      /* 如果处于编辑状态，且不是点 input，就不处理 */
       const li = e.target.closest('.item');
       if (!li) return;
+
       const day = App.state.day;
       const id = li.dataset.id;
       const t = day.todos.find(x => x.id === id);
       if (!t) return;
 
+      /* 删除 */
       if (e.target.closest('.del')) {
         day.todos = day.todos.filter(x => x.id !== id);
         store.save();
@@ -555,11 +573,13 @@
         return;
       }
 
+      /* 修改 */
       if (e.target.closest('.edit')) {
         startEdit(li, t);
         return;
       }
 
+      /* 星标 */
       if (e.target.closest('.star-btn')) {
         t.starred = !t.starred;
         store.save();
@@ -567,6 +587,7 @@
         return;
       }
 
+      /* 打勾 或 点文字 */
       if (e.target.closest('.check') || e.target.closest('.txt')) {
         if (li.dataset.editing) return;
         if (App.state.selectedDateKey !== App.state.todayKey) {
@@ -582,6 +603,7 @@
       }
     });
 
+    /* 键盘可访问性 */
     $('#list').addEventListener('keydown', e => {
       if (e.key !== 'Enter' && e.key !== ' ') return;
       const c = e.target.closest('.check');

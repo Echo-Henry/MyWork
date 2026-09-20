@@ -9,7 +9,6 @@
   let lastAllDone = false;
   let noteTimer = null;
   let noteEl = null;
-  let remindTarget = null; // { dateKey, id }
 
   const pad2 = n => String(n).padStart(2, '0');
 
@@ -103,37 +102,6 @@
     noteEl.value = App.state.day.note;
   }
 
-  /* ============ 提醒时间格式化 ============ */
-  function formatRemind(remind) {
-    if (!remind) return '';
-    const p = remind.split(' ');
-    if (p.length !== 2) return remind;
-    const datePart = p[0];
-    const timePart = p[1];
-    const todayKey = App.state.todayKey;
-    if (datePart === todayKey) return '今天 ' + timePart;
-
-    const dp = datePart.split('-');
-    const dDate = new Date(+dp[0], +dp[1] - 1, +dp[2]);
-    const t = new Date();
-    t.setHours(0, 0, 0, 0);
-    const diff = Math.round((dDate - t) / 86400000);
-    if (diff === 1) return '明天 ' + timePart;
-    if (diff === 2) return '后天 ' + timePart;
-    return (dp[1]) + '/' + (dp[2]) + ' ' + timePart;
-  }
-
-  function isOverdue(remind) {
-    if (!remind) return false;
-    return remind < nowStr();
-  }
-
-  function nowStr() {
-    const n = new Date();
-    return n.getFullYear() + '-' + pad2(n.getMonth() + 1) + '-' + pad2(n.getDate())
-      + ' ' + pad2(n.getHours()) + ':' + pad2(n.getMinutes());
-  }
-
   /* ============ 待办列表 ============ */
   function renderTodayList(newestId) {
     const day = App.state.day;
@@ -147,6 +115,8 @@
       if (a.done !== b.done) return a.done - b.done;
       return 0;
     });
+
+    const frag = document.createDocumentFragment();
 
     day.todos.forEach((t, index) => {
       const key = CATS[t.cat] ? t.cat : 'other';
@@ -175,13 +145,6 @@
       txt.className = 'txt';
       txt.textContent = t.text;
 
-      let remindTag = null;
-      if (t.remind) {
-        remindTag = document.createElement('span');
-        remindTag.className = 'remind-badge' + (isOverdue(t.remind) ? ' overdue' : '');
-        remindTag.textContent = '⏰ ' + formatRemind(t.remind);
-      }
-
       const tag = document.createElement('span');
       tag.className = 'tag';
       tag.dataset.cat = key;
@@ -190,11 +153,6 @@
       const star = document.createElement('span');
       star.className = 'star-btn' + (t.starred ? ' active' : '');
       star.innerHTML = t.starred ? '⭐' : '☆';
-
-      const bell = document.createElement('span');
-      bell.className = 'bell-btn' + (t.remind ? ' active' : '');
-      bell.innerHTML = t.remind ? '🔔' : '🔕';
-      bell.title = t.remind ? ('提醒时间: ' + t.remind) : '点击设置定时提醒';
 
       const edit = document.createElement('button');
       edit.className = 'edit';
@@ -211,22 +169,35 @@
       li.appendChild(num);
       li.appendChild(check);
       li.appendChild(txt);
-      if (remindTag) li.appendChild(remindTag);
       li.appendChild(tag);
       li.appendChild(star);
-      li.appendChild(bell);
       li.appendChild(edit);
       li.appendChild(del);
-      listEl.appendChild(li);
+      frag.appendChild(li);
     });
+
+    listEl.appendChild(frag);
 
     $('#empty').style.display = day.todos.length ? 'none' : 'block';
     updateProgress();
 
+    /* ★ Sortable：长按 400ms 才启动拖拽，按钮上的操作完全不干扰 */
     if (isToday && window.Sortable) {
-      if (listEl._sortable) listEl._sortable.destroy();
+      if (listEl._sortable) {
+        listEl._sortable.destroy();
+        listEl._sortable = null;
+      }
       listEl._sortable = new Sortable(listEl, {
-        animation: 150,
+        animation: 180,
+        delay: 400,                    /* 手机：长按 400ms 才触发拖拽 */
+        delayOnTouchOnly: true,        /* 只在触屏触发长按，鼠标上直接拖 */
+        touchStartThreshold: 12,       /* 手指移动超 12px 视为滑动，不算拖拽 */
+        fallbackTolerance: 12,
+        filter: '.check, .edit, .del, .star-btn, .edit-input, .tag',
+        preventOnFilter: false,        /* 按钮上的点击事件继续生效 */
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        dragClass: 'sortable-drag',
         onEnd: function (evt) {
           const movedItem = day.todos.splice(evt.oldIndex, 1)[0];
           day.todos.splice(evt.newIndex, 0, movedItem);
@@ -275,7 +246,7 @@
     const text = input.value.trim();
     if (!text) { input.focus(); return; }
 
-    const item = { id: uid(), text: text, cat: curCat, done: false, starred: false, remind: '' };
+    const item = { id: uid(), text: text, cat: curCat, done: false, starred: false };
     App.state.day.todos.push(item);
     input.value = '';
     store.save();
@@ -291,15 +262,30 @@
     const txt = li.querySelector('.txt');
     if (!txt) return;
 
-    const input = document.createElement('input');
-    input.type = 'text';
+    const input = document.createElement('textarea');
     input.className = 'edit-input';
     input.value = t.text;
-    input.maxLength = 60;
+    input.maxLength = 200;
+    input.rows = 1;
+    input.setAttribute('aria-label', '修改待办');
 
     li.replaceChild(input, txt);
+
+    function autoResize() {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 240) + 'px';
+    }
+    autoResize();
+    input.addEventListener('input', autoResize);
+
     input.focus();
-    try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) {}
+    try {
+      input.setSelectionRange(input.value.length, input.value.length);
+    } catch (e) {}
+    setTimeout(function () {
+      input.scrollTop = input.scrollHeight;
+      autoResize();
+    }, 0);
 
     let finished = false;
     function finish(commit) {
@@ -313,11 +299,16 @@
       renderTodayList();
     }
 
-    input.addEventListener('keydown', ev => {
-      if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
-      else if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
+    input.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter' && !ev.shiftKey) {
+        ev.preventDefault();
+        finish(true);
+      } else if (ev.key === 'Escape') {
+        ev.preventDefault();
+        finish(false);
+      }
     });
-    input.addEventListener('blur', () => finish(true));
+    input.addEventListener('blur', function () { finish(true); });
   }
 
   /* ============ 心情 ============ */
@@ -325,197 +316,19 @@
     const day = App.state.day;
     const box = $('#moods');
     box.innerHTML = '';
+    const frag = document.createDocumentFragment();
     MOODS.forEach(m => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'mood' + (day.mood === m ? ' active' : '');
       b.dataset.mood = m;
       b.textContent = m;
-      box.appendChild(b);
+      frag.appendChild(b);
     });
+    box.appendChild(frag);
     $('#moodTip').textContent = day.mood
       ? (MOOD_TIPS[day.mood] || '记录好啦～')
       : '点一下记录心情吧';
-  }
-
-  /* ============ 提醒弹窗 ============ */
-  function openRemindDialog(dateKey, todoId) {
-    const dayRef = store.getDayRef(dateKey);
-    const t = dayRef.todos.find(x => x.id === todoId);
-    if (!t) return;
-
-    remindTarget = { dateKey: dateKey, id: todoId };
-
-    $('#remindTask').textContent = t.text;
-
-    let defaultDate = dateKey;
-    let defaultTime = '09:00';
-
-    if (t.remind) {
-      const parts = t.remind.split(' ');
-      if (parts.length === 2) {
-        defaultDate = parts[0];
-        defaultTime = parts[1];
-      }
-    } else {
-      if (dateKey === App.state.todayKey) {
-        const n = new Date();
-        n.setHours(n.getHours() + 1);
-        defaultTime = pad2(n.getHours()) + ':' + pad2(n.getMinutes());
-      }
-    }
-
-    $('#remindDate').value = defaultDate;
-    $('#remindTime').value = defaultTime;
-
-    $('#remindModal').style.display = 'flex';
-  }
-
-  function closeRemind() {
-    $('#remindModal').style.display = 'none';
-    remindTarget = null;
-  }
-
-  function quickRemind(offsetDays) {
-    if (!remindTarget) return;
-    const base = new Date();
-    base.setDate(base.getDate() + offsetDays);
-    const dateStr = base.getFullYear() + '-' + pad2(base.getMonth() + 1) + '-' + pad2(base.getDate());
-
-    let timeStr = '09:00';
-    if (offsetDays === 0) timeStr = '20:00';
-
-    $('#remindDate').value = dateStr;
-    $('#remindTime').value = timeStr;
-  }
-
-  /* ============ 安卓系统级闹钟（应用关闭也能提醒） ============ */
-  function setAndroidAlarm(remindStr, todoText) {
-    if (!window.plus || plus.os.name !== 'Android') return false;
-    try {
-      const parts = remindStr.split(' ');
-      const dp = parts[0].split('-');
-      const tp = parts[1].split(':');
-      const target = new Date(+dp[0], +dp[1] - 1, +dp[2], +tp[0], +tp[1], 0).getTime();
-      const now = Date.now();
-      if (target <= now) return false;
-
-      const main = plus.android.runtimeMainActivity();
-      const Context = plus.android.importClass('android.content.Context');
-      const Intent = plus.android.importClass('android.content.Intent');
-      const PendingIntent = plus.android.importClass('android.app.PendingIntent');
-      const AlarmManager = plus.android.importClass('android.app.AlarmManager');
-
-      const intent = new Intent(main, main.getClass());
-      intent.putExtra('remind_text', todoText);
-      intent.putExtra('remind_time', remindStr);
-
-      const requestCode = Math.floor(Math.random() * 100000);
-      // FLAG_UPDATE_CURRENT = 0x08000000，FLAG_IMMUTABLE = 0x04000000
-      const flags = 0x08000000 | 0x04000000;
-      const pi = PendingIntent.getActivity(main, requestCode, intent, flags);
-
-      const am = main.getSystemService(Context.ALARM_SERVICE);
-      am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target, pi);
-      return true;
-    } catch (e) {
-      console.error('注册系统闹钟失败', e);
-      return false;
-    }
-  }
-
-  function saveRemind() {
-    if (!remindTarget) return;
-    const dateVal = $('#remindDate').value;
-    const timeVal = $('#remindTime').value;
-
-    if (!dateVal || !timeVal) {
-      alert('请选择日期和时间');
-      return;
-    }
-
-    const dayRef = store.getDayRef(remindTarget.dateKey);
-    const t = dayRef.todos.find(x => x.id === remindTarget.id);
-    if (!t) { closeRemind(); return; }
-
-    const remindStr = dateVal + ' ' + timeVal;
-    const nowS = nowStr();
-
-    if (remindStr <= nowS) {
-      if (!confirm('设置的时间已经过去了，确定要保存吗？\n（保存后会立即提醒一次）')) {
-        return;
-      }
-    }
-
-    t.remind = remindStr;
-    store.save();
-
-    /* ★ 注册到安卓系统闹钟：应用关闭也能触发 */
-    const ok = setAndroidAlarm(remindStr, t.text);
-    if (ok) {
-      alert('✅ 已注册系统闹钟\n即使关闭应用，到时间也会提醒你');
-    }
-
-    if ('Notification' in window && Notification.permission === 'default') {
-      try { Notification.requestPermission(); } catch (e) {}
-    }
-
-    closeRemind();
-    renderTodayList();
-  }
-
-  function clearRemind() {
-    if (!remindTarget) return;
-    const dayRef = store.getDayRef(remindTarget.dateKey);
-    const t = dayRef.todos.find(x => x.id === remindTarget.id);
-    if (t) {
-      t.remind = '';
-      store.save();
-    }
-    closeRemind();
-    renderTodayList();
-  }
-
-  /* ============ 通知触发 ============ */
-  function triggerNotify(title, body) {
-    if (window.plus && plus.push && plus.push.createMessage) {
-      try {
-        plus.push.createMessage(body, 'LocalMsg', { title: title });
-        return;
-      } catch (e) {}
-    }
-    if ('Notification' in window && Notification.permission === 'granted') {
-      try {
-        new Notification(title, { body: body, icon: 'icon-192.png' });
-        return;
-      } catch (e) {}
-    }
-    alert(title + '\n' + body);
-  }
-
-  function checkReminders() {
-    const nowS = nowStr();
-    let changed = false;
-    const allData = (store.getAll ? store.getAll() : {}) || {};
-
-    for (let dateKey in allData) {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) continue;
-      const dayData = allData[dateKey];
-      if (!dayData || !Array.isArray(dayData.todos)) continue;
-
-      dayData.todos.forEach(t => {
-        if (t.remind && !t.done && t.remind <= nowS) {
-          triggerNotify('待办提醒 ⏰', '时间到啦，记得完成：' + t.text);
-          t.remind = '';
-          changed = true;
-        }
-      });
-    }
-
-    if (changed) {
-      store.save();
-      if (App.state.day) renderTodayList();
-    }
   }
 
   /* ============ 设置面板 ============ */
@@ -556,7 +369,7 @@
       md += '## 📝 待办清单\n';
       if (d.todos.length) {
         d.todos.forEach((t, i) => {
-          md += (i + 1) + '. [' + (t.done ? 'x' : ' ') + '] ' + t.text + (t.starred ? ' ⭐' : '') + (t.remind ? ' ⏰' + t.remind : '') + '\n';
+          md += (i + 1) + '. [' + (t.done ? 'x' : ' ') + '] ' + t.text + (t.starred ? ' ⭐' : '') + '\n';
         });
       } else { md += '（无）\n'; }
       md += '\n## 🌈 今日心情\n' + (d.mood || '（无）') + '\n\n';
@@ -730,8 +543,6 @@
     renderTodayList();
     renderMoods();
 
-    setInterval(checkReminders, 30000);
-
     $('#dateStrip').addEventListener('click', e => {
       const chip = e.target.closest('.dchip');
       if (!chip) return;
@@ -743,14 +554,18 @@
       if (e.key === 'Enter') { e.preventDefault(); addTodo(); }
     });
 
-    $('#list').addEventListener('click', e => {
+    /* ★ 用 pointerup 处理点击，比 click 更快更稳 */
+    $('#list').addEventListener('pointerup', e => {
+      /* 如果处于编辑状态，且不是点 input，就不处理 */
       const li = e.target.closest('.item');
       if (!li) return;
+
       const day = App.state.day;
       const id = li.dataset.id;
       const t = day.todos.find(x => x.id === id);
       if (!t) return;
 
+      /* 删除 */
       if (e.target.closest('.del')) {
         day.todos = day.todos.filter(x => x.id !== id);
         store.save();
@@ -758,11 +573,13 @@
         return;
       }
 
+      /* 修改 */
       if (e.target.closest('.edit')) {
         startEdit(li, t);
         return;
       }
 
+      /* 星标 */
       if (e.target.closest('.star-btn')) {
         t.starred = !t.starred;
         store.save();
@@ -770,11 +587,7 @@
         return;
       }
 
-      if (e.target.closest('.bell-btn')) {
-        openRemindDialog(App.state.selectedDateKey, t.id);
-        return;
-      }
-
+      /* 打勾 或 点文字 */
       if (e.target.closest('.check') || e.target.closest('.txt')) {
         if (li.dataset.editing) return;
         if (App.state.selectedDateKey !== App.state.todayKey) {
@@ -790,6 +603,7 @@
       }
     });
 
+    /* 键盘可访问性 */
     $('#list').addEventListener('keydown', e => {
       if (e.key !== 'Enter' && e.key !== ' ') return;
       const c = e.target.closest('.check');
@@ -838,7 +652,6 @@
     openSettings, closeSettings,
     exportData, importData,
     exportMarkdown, copyOutput,
-    generateAISummary,
-    openRemindDialog, closeRemind, saveRemind, clearRemind, quickRemind
+    generateAISummary
   };
 })(window.App);

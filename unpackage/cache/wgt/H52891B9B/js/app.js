@@ -40,26 +40,6 @@
         App.store.save();
       }
     });
-
-    /* ★ 检查 App 是不是被系统闹钟唤醒的，是的话弹出通知 */
-    setTimeout(function () {
-      if (window.plus && plus.os.name === 'Android') {
-        try {
-          const main = plus.android.runtimeMainActivity();
-          const intent = main.getIntent();
-          const remindText = intent.getStringExtra('remind_text');
-          if (remindText) {
-            if (plus.push && plus.push.createMessage) {
-              plus.push.createMessage(remindText, 'LocalMsg', { title: '待办提醒 ⏰' });
-            } else {
-              alert('待办提醒 ⏰\n' + remindText);
-            }
-          }
-        } catch (e) {
-          /* 忽略 */
-        }
-      }
-    }, 800);
   }
 
   if (document.readyState === 'loading') {
