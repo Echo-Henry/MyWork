@@ -11,10 +11,10 @@
   let noteEl = null;
   let inputEl = null;
   let lastExportedFileName = '';
+  let lastExportedFilePath = '';
 
   const pad2 = n => String(n).padStart(2, '0');
 
-  /* ============ 顶部文案 ============ */
   function greetingByHour() {
     const h = new Date().getHours();
     if (h < 5)  return '夜深了，早点休息哦 🌙';
@@ -65,20 +65,16 @@
     $('#quote').textContent = '「 ' + QUOTES[seed % QUOTES.length] + ' 」';
   }
 
-  /* ============ 系统通知辅助 ============ */
   function sendNotify(title, content) {
     if (window.plus && plus.push && plus.push.createMessage) {
       try {
         plus.push.createMessage(content, 'LocalMsg', { title: title });
         return true;
-      } catch (e) {
-        /* 忽略 */
-      }
+      } catch (e) {}
     }
     return false;
   }
 
-  /* ============ 日期条 ============ */
   function buildStrip() {
     const strip = $('#dateStrip');
     strip.innerHTML = '';
@@ -101,7 +97,6 @@
     $$('.dchip').forEach(c => c.classList.toggle('active', c.dataset.key === App.state.selectedDateKey));
   }
 
-  /* ============ 切换日期 ============ */
   function switchDate(key) {
     if (key === App.state.selectedDateKey) return;
     if (noteTimer) { clearTimeout(noteTimer); noteTimer = null; }
@@ -119,7 +114,6 @@
     noteEl.value = App.state.day.note;
   }
 
-  /* ============ 待办列表 ============ */
   function renderTodayList(newestId) {
     const day = App.state.day;
     const listEl = $('#list');
@@ -240,7 +234,6 @@
     }
   }
 
-  /* ============ 进度 ============ */
   function updateProgress() {
     const day = App.state.day;
     const total = day.todos.length;
@@ -256,7 +249,6 @@
     lastAllDone = allDone;
   }
 
-  /* ============ 撒花 ============ */
   function celebrate() {
     const emojis = ['🎉', '✨', '💖', '🌸', '⭐️', '🍰'];
     for (let i = 0; i < 14; i++) {
@@ -271,14 +263,12 @@
     }
   }
 
-  /* ============ 输入框自动撑高 ============ */
   function autoGrowInput() {
     if (!inputEl) return;
     inputEl.style.height = 'auto';
     inputEl.style.height = Math.min(inputEl.scrollHeight, 140) + 'px';
   }
 
-  /* ============ 添加 ============ */
   function addTodo() {
     const text = inputEl.value.trim();
     if (!text) { inputEl.focus(); return; }
@@ -292,7 +282,6 @@
     inputEl.focus();
   }
 
-  /* ============ 编辑 ============ */
   function startEdit(li, t) {
     if (li.dataset.editing) return;
     li.dataset.editing = '1';
@@ -349,7 +338,6 @@
     input.addEventListener('blur', function () { finish(true); });
   }
 
-  /* ============ 心情 ============ */
   function renderMoods() {
     const day = App.state.day;
     const box = $('#moods');
@@ -369,11 +357,9 @@
       : '点一下记录心情吧';
   }
 
-  /* ============ 设置面板 ============ */
   function openSettings() { $('#settingsModal').style.display = 'flex'; }
   function closeSettings() { $('#settingsModal').style.display = 'none'; }
 
-  /* ============ 导出成功弹窗 ============ */
   function showExportSuccess(fileName) {
     lastExportedFileName = fileName;
     const el = document.getElementById('exportFileName');
@@ -400,55 +386,74 @@
       return;
     }
 
-    // 判断当前是不是处于无线调试基座
-    var isBaseApp = (plus.runtime.appid === 'HBuilder');
-    var appFolder = isBaseApp ? 'io.dcloud.HBuilder' : plus.runtime.appid;
+    var main = plus.android.runtimeMainActivity();
+    var Intent = plus.android.importClass('android.content.Intent');
+    var Uri = plus.android.importClass('android.net.Uri');
+    var FLAG_NEW_TASK = 268435456;
+    var success = false;
 
-    // 给用户一个清晰无误的路径提示
-    var pathDesc = '内部存储 -> Android -> data -> ' + appFolder + ' -> files -> Documents';
-
-    alert('文件已保存在：\n' + pathDesc + '\n\n文件名：' + lastExportedFileName + '\n\n如果您在文件管理里找不到，请直接使用“分享到微信”功能发送文件。');
-
-    // 尝试帮你打开系统的“文件管理”App
-    try {
-      var main = plus.android.runtimeMainActivity();
-      var Intent = plus.android.importClass('android.content.Intent');
-      // ACTION_MAIN 配合 APP_FILES 类别，通常能直接唤起华为/荣耀的文件管理器
-      var intent = new Intent('android.intent.action.MAIN');
-      intent.addCategory('android.intent.category.APP_FILES');
-      intent.addFlags(268435456);
-      main.startActivity(intent);
-    } catch (e) {
-      // 如果打不开就算了，前面弹窗已经把路径说得很清楚了
-    }
-  }
-
-  /* ============ 分享导出文件到微信 ============ */
-  function shareExportFile() {
-    if (!lastExportedFileName) {
-      alert('没有可分享的文件，请先导出数据。');
-      return;
+    /* 方案 1：用 DocumentsContract 直接定位到公共 Download 目录 */
+    if (!success) {
+      try {
+        var DocumentsContract = plus.android.importClass('android.provider.DocumentsContract');
+        var uri = DocumentsContract.buildDocumentUri(
+          'com.android.externalstorage.documents',
+          'primary:Download'
+        );
+        var intent = new Intent(Intent.ACTION_VIEW);
+        intent.setDataAndType(uri, 'vnd.android.document/directory');
+        intent.addFlags(FLAG_NEW_TASK);
+        main.startActivity(intent);
+        success = true;
+      } catch (e1) { success = false; }
     }
 
-    if (!window.plus || !plus.share) {
-      alert('请在 App 内使用分享功能。');
-      return;
+    /* 方案 2：用 content:// URI 直接打开 Download 目录 */
+    if (!success) {
+      try {
+        var uri2 = Uri.parse('content://com.android.externalstorage.documents/document/primary%3ADownload');
+        var intent2 = new Intent(Intent.ACTION_VIEW);
+        intent2.setDataAndType(uri2, 'vnd.android.document/directory');
+        intent2.addFlags(FLAG_NEW_TASK);
+        main.startActivity(intent2);
+        success = true;
+      } catch (e2) { success = false; }
     }
 
-    plus.io.requestFileSystem(plus.io.PUBLIC_DOCUMENTS, function (fs) {
-      fs.root.getFile(lastExportedFileName, { create: false }, function (fileEntry) {
-        plus.share.sendWithSystem({
-          type: 'file',
-          filePath: fileEntry.fullPath
-        }, function () {}, function (e) {
-          alert('分享失败：' + (e.message || '未知错误'));
-        });
-      }, function (e) {
-        alert('找不到导出文件，请重新导出一次。');
-      });
-    }, function (e) {
-      alert('获取文件系统失败：' + (e.message || '未知错误'));
-    });
+    /* 方案 3：尝试启动华为/荣耀自带文件管理器 */
+    if (!success) {
+      var pkgs = [
+        'com.huawei.hidisk',
+        'com.huawei.filemanager',
+        'com.android.documentsui'
+      ];
+      for (var i = 0; i < pkgs.length; i++) {
+        try {
+          var launchIntent = main.getPackageManager().getLaunchIntentForPackage(pkgs[i]);
+          if (launchIntent) {
+            launchIntent.addFlags(FLAG_NEW_TASK);
+            main.startActivity(launchIntent);
+            success = true;
+            break;
+          }
+        } catch (e3) { /* 继续试 */ }
+      }
+    }
+
+    /* 方案 4：系统文件选择器兜底 */
+    if (!success) {
+      try {
+        var intent4 = new Intent(Intent.ACTION_GET_CONTENT);
+        intent4.setType('*/*');
+        intent4.addFlags(FLAG_NEW_TASK);
+        main.startActivity(intent4);
+        success = true;
+      } catch (e4) { success = false; }
+    }
+
+    if (!success) {
+      alert('当前设备不支持自动跳转。\n\n请手动打开手机自带的「文件管理」App → 点「下载」分类，找到：\n\n' + lastExportedFileName);
+    }
   }
 
   /* ============ 导出加密数据 ============ */
@@ -458,9 +463,10 @@
 
     sendNotify('📤 正在导出', '正在生成加密备份文件，请稍等…');
 
-    const result = store.exportData(password, function (fileName) {
+    const result = store.exportData(password, function (fileName, filePath) {
       lastExportedFileName = fileName;
-      sendNotify('✅ 导出完成', '文件已生成，可在手机「文件管理 - 下载」中查找。文件名：' + fileName);
+      lastExportedFilePath = filePath || '';
+      sendNotify('✅ 导出完成', '文件已生成，可在手机「文件管理」中查找。文件名：' + fileName);
       showExportSuccess(fileName);
     });
 
@@ -541,7 +547,6 @@
     }
   }
 
-  /* ============ AI 月度总结 ============ */
   function generateAISummary() {
     const allData = (store.getAll ? store.getAll() : {}) || {};
     const allKeys = Object.keys(allData).sort();
@@ -662,7 +667,6 @@
       });
   }
 
-  /* ============ 初始化 ============ */
   function init() {
     noteEl = $('#note');
     noteEl.value = App.state.day.note;
@@ -775,7 +779,6 @@
     exportData, importData,
     exportMarkdown, copyOutput,
     generateAISummary,
-    openExportFolder, closeExportModal,
-    shareExportFile
+    openExportFolder, closeExportModal
   };
 })(window.App);

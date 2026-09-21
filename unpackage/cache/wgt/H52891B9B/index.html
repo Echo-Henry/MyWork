@@ -144,7 +144,7 @@
       <p class="desc">不联网工具换手机最怕数据丢失，导出加密文件，换机无忧。</p>
       <button class="btn" onclick="App.today.exportData()">📤 导出加密数据</button>
       <button class="btn ghost" onclick="document.getElementById('importFile').click()">📥 导入数据</button>
-      <input type="file" id="importFile" style="display:none" accept=".workbench" onchange="App.today.importData(this.files[0])">
+      <input type="file" id="importFile" style="display:none" accept="*/*" onchange="App.today.importData(this.files[0])">
     </div>
     <div class="setting-item">
       <h3>📄 明文导出</h3>
@@ -167,7 +167,7 @@
   </div>
 </div>
 
-<!-- 导出成功弹窗 -->
+<!-- 导出成功弹窗（已移除微信分享按钮） -->
 <div id="exportModal" class="modal" style="display:none;">
   <div class="modal-content">
     <h2>📤 导出成功</h2>
@@ -176,9 +176,6 @@
       <strong id="exportFileName">—</strong>
     </div>
     <p class="export-tip" id="exportPathTip">💡 文件已保存到手机存储，点下方按钮可尝试打开</p>
-    
-    <!-- 新增的分享到微信按钮 -->
-    <button class="btn wechat-btn" onclick="App.today.shareExportFile()">💬 分享到微信</button>
     <button class="btn" onclick="App.today.openExportFolder()">📂 打开文件夹</button>
     <button class="btn ghost" onclick="App.today.closeExportModal()">关闭</button>
   </div>
