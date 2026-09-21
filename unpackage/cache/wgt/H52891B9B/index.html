@@ -19,6 +19,7 @@
     <div class="brand"><span class="logo">🌸</span><span>好好生活</span></div>
     <div class="top-right">
       <button class="settings-btn" onclick="App.today.openSettings()" aria-label="设置" title="设置">⚙️</button>
+      <button class="ai-btn" onclick="App.today.generateAISummary()" aria-label="AI月度总结" title="AI 月度总结">🤖</button>
       <div class="tabs" id="tabs">
         <button class="tab active" data-view="today">今天</button>
         <button class="tab" data-view="history">历史</button>
@@ -62,7 +63,7 @@
           <button class="cat" data-cat="other">✨ 其他</button>
         </div>
         <div class="add-row">
-          <input id="input" type="text" placeholder="只需输入待办事项内容，系统会自动排序" maxlength="200" autocomplete="off">
+          <textarea id="input" placeholder="只需输入待办事项内容，系统会自动排序（回车添加，Shift+回车换行）" maxlength="200" rows="1" autocomplete="off"></textarea>
           <button id="addBtn" class="add-btn" aria-label="添加">＋</button>
         </div>
         <ul class="list" id="list"></ul>
@@ -151,11 +152,6 @@
       <button class="btn ghost" onclick="App.today.exportMarkdown('day')">📝 导出今日明文</button>
       <button class="btn ghost" onclick="App.today.exportMarkdown('month')">📅 导出当月明文</button>
     </div>
-    <div class="setting-item">
-      <h3>🤖 AI 月度总结</h3>
-      <p class="desc">基于本地数据，月底生成专属总结，数据不上传。</p>
-      <button class="btn" onclick="App.today.generateAISummary()">✨ 生成本月总结</button>
-    </div>
     <div class="setting-item" style="border:none;">
       <button class="btn danger" onclick="App.today.closeSettings()">关闭</button>
     </div>
@@ -168,6 +164,23 @@
     <textarea id="outputText" readonly style="width:100%;height:200px;border:1.5px solid var(--line);border-radius:12px;padding:10px;font-size:13px;line-height:1.7;resize:none;margin-bottom:12px;background:#FFFBFB;font-family:inherit;color:var(--text);"></textarea>
     <button class="btn" onclick="App.today.copyOutput()">📋 复制内容</button>
     <button class="btn ghost" onclick="document.getElementById('outputModal').style.display='none'">关闭</button>
+  </div>
+</div>
+
+<!-- 导出成功弹窗 -->
+<div id="exportModal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <h2>📤 导出成功</h2>
+    <div class="export-info">
+      <span>文件名：</span>
+      <strong id="exportFileName">—</strong>
+    </div>
+    <p class="export-tip" id="exportPathTip">💡 文件已保存到手机存储，点下方按钮可尝试打开</p>
+    
+    <!-- 新增的分享到微信按钮 -->
+    <button class="btn wechat-btn" onclick="App.today.shareExportFile()">💬 分享到微信</button>
+    <button class="btn" onclick="App.today.openExportFolder()">📂 打开文件夹</button>
+    <button class="btn ghost" onclick="App.today.closeExportModal()">关闭</button>
   </div>
 </div>
 

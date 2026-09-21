@@ -9,6 +9,8 @@
   let lastAllDone = false;
   let noteTimer = null;
   let noteEl = null;
+  let inputEl = null;
+  let lastExportedFileName = '';
 
   const pad2 = n => String(n).padStart(2, '0');
 
@@ -56,9 +58,24 @@
     $('#moodLabel').textContent = '🌈 ' + prefix + '心情';
     $('#noteLabel').textContent = '💭 ' + prefix + '碎碎念';
 
-    $('#input').placeholder = '只需输入待办事项内容，系统会自动排序';
+    if (inputEl) {
+      inputEl.placeholder = '只需输入待办事项内容，系统会自动排序（回车添加，Shift+回车换行）';
+    }
 
     $('#quote').textContent = '「 ' + QUOTES[seed % QUOTES.length] + ' 」';
+  }
+
+  /* ============ 系统通知辅助 ============ */
+  function sendNotify(title, content) {
+    if (window.plus && plus.push && plus.push.createMessage) {
+      try {
+        plus.push.createMessage(content, 'LocalMsg', { title: title });
+        return true;
+      } catch (e) {
+        /* 忽略 */
+      }
+    }
+    return false;
   }
 
   /* ============ 日期条 ============ */
@@ -154,23 +171,38 @@
       star.className = 'star-btn' + (t.starred ? ' active' : '');
       star.innerHTML = t.starred ? '⭐' : '☆';
 
+      const handle = document.createElement('span');
+      handle.className = 'drag-handle';
+      handle.innerHTML = '☰';
+      handle.title = '按住拖动排序';
+      handle.setAttribute('aria-label', '按住拖动排序');
+
       const edit = document.createElement('button');
       edit.className = 'edit';
       edit.type = 'button';
       edit.title = '修改';
+      edit.setAttribute('aria-label', '修改');
       edit.textContent = '✎';
 
       const del = document.createElement('button');
       del.className = 'del';
       del.type = 'button';
       del.title = '删除';
+      del.setAttribute('aria-label', '删除');
       del.textContent = '✕';
+
+      edit.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        ev.preventDefault();
+        startEdit(li, t);
+      });
 
       li.appendChild(num);
       li.appendChild(check);
       li.appendChild(txt);
       li.appendChild(tag);
       li.appendChild(star);
+      li.appendChild(handle);
       li.appendChild(edit);
       li.appendChild(del);
       frag.appendChild(li);
@@ -181,7 +213,6 @@
     $('#empty').style.display = day.todos.length ? 'none' : 'block';
     updateProgress();
 
-    /* ★ Sortable：长按 400ms 才启动拖拽，按钮上的操作完全不干扰 */
     if (isToday && window.Sortable) {
       if (listEl._sortable) {
         listEl._sortable.destroy();
@@ -189,12 +220,12 @@
       }
       listEl._sortable = new Sortable(listEl, {
         animation: 180,
-        delay: 400,                    /* 手机：长按 400ms 才触发拖拽 */
-        delayOnTouchOnly: true,        /* 只在触屏触发长按，鼠标上直接拖 */
-        touchStartThreshold: 12,       /* 手指移动超 12px 视为滑动，不算拖拽 */
-        fallbackTolerance: 12,
+        handle: '.drag-handle',
+        delay: 1000,
+        delayOnTouchOnly: true,
+        touchStartThreshold: 8,
         filter: '.check, .edit, .del, .star-btn, .edit-input, .tag',
-        preventOnFilter: false,        /* 按钮上的点击事件继续生效 */
+        preventOnFilter: false,
         ghostClass: 'sortable-ghost',
         chosenClass: 'sortable-chosen',
         dragClass: 'sortable-drag',
@@ -240,18 +271,25 @@
     }
   }
 
+  /* ============ 输入框自动撑高 ============ */
+  function autoGrowInput() {
+    if (!inputEl) return;
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 140) + 'px';
+  }
+
   /* ============ 添加 ============ */
   function addTodo() {
-    const input = $('#input');
-    const text = input.value.trim();
-    if (!text) { input.focus(); return; }
+    const text = inputEl.value.trim();
+    if (!text) { inputEl.focus(); return; }
 
     const item = { id: uid(), text: text, cat: curCat, done: false, starred: false };
     App.state.day.todos.push(item);
-    input.value = '';
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
     store.save();
     renderTodayList(item.id);
-    input.focus();
+    inputEl.focus();
   }
 
   /* ============ 编辑 ============ */
@@ -335,15 +373,103 @@
   function openSettings() { $('#settingsModal').style.display = 'flex'; }
   function closeSettings() { $('#settingsModal').style.display = 'none'; }
 
+  /* ============ 导出成功弹窗 ============ */
+  function showExportSuccess(fileName) {
+    lastExportedFileName = fileName;
+    const el = document.getElementById('exportFileName');
+    if (el) el.textContent = fileName;
+
+    const tipEl = document.getElementById('exportPathTip');
+    if (tipEl) {
+      tipEl.textContent = '💡 文件已保存到手机存储，点下方按钮可尝试打开。';
+    }
+
+    const modal = document.getElementById('exportModal');
+    if (modal) modal.style.display = 'flex';
+  }
+
+  function closeExportModal() {
+    const modal = document.getElementById('exportModal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  /* ============ 打开文件所在文件夹 ============ */
+  function openExportFolder() {
+    if (!window.plus || plus.os.name !== 'Android') {
+      alert('文件已保存到「下载」文件夹。\n\n文件名：' + lastExportedFileName);
+      return;
+    }
+
+    // 判断当前是不是处于无线调试基座
+    var isBaseApp = (plus.runtime.appid === 'HBuilder');
+    var appFolder = isBaseApp ? 'io.dcloud.HBuilder' : plus.runtime.appid;
+
+    // 给用户一个清晰无误的路径提示
+    var pathDesc = '内部存储 -> Android -> data -> ' + appFolder + ' -> files -> Documents';
+
+    alert('文件已保存在：\n' + pathDesc + '\n\n文件名：' + lastExportedFileName + '\n\n如果您在文件管理里找不到，请直接使用“分享到微信”功能发送文件。');
+
+    // 尝试帮你打开系统的“文件管理”App
+    try {
+      var main = plus.android.runtimeMainActivity();
+      var Intent = plus.android.importClass('android.content.Intent');
+      // ACTION_MAIN 配合 APP_FILES 类别，通常能直接唤起华为/荣耀的文件管理器
+      var intent = new Intent('android.intent.action.MAIN');
+      intent.addCategory('android.intent.category.APP_FILES');
+      intent.addFlags(268435456);
+      main.startActivity(intent);
+    } catch (e) {
+      // 如果打不开就算了，前面弹窗已经把路径说得很清楚了
+    }
+  }
+
+  /* ============ 分享导出文件到微信 ============ */
+  function shareExportFile() {
+    if (!lastExportedFileName) {
+      alert('没有可分享的文件，请先导出数据。');
+      return;
+    }
+
+    if (!window.plus || !plus.share) {
+      alert('请在 App 内使用分享功能。');
+      return;
+    }
+
+    plus.io.requestFileSystem(plus.io.PUBLIC_DOCUMENTS, function (fs) {
+      fs.root.getFile(lastExportedFileName, { create: false }, function (fileEntry) {
+        plus.share.sendWithSystem({
+          type: 'file',
+          filePath: fileEntry.fullPath
+        }, function () {}, function (e) {
+          alert('分享失败：' + (e.message || '未知错误'));
+        });
+      }, function (e) {
+        alert('找不到导出文件，请重新导出一次。');
+      });
+    }, function (e) {
+      alert('获取文件系统失败：' + (e.message || '未知错误'));
+    });
+  }
+
+  /* ============ 导出加密数据 ============ */
   function exportData() {
     const password = prompt('请设置导出密码（用于换机导入）：');
     if (!password) return;
-    try {
-      const fileName = store.exportData(password);
-      alert('导出成功！\n文件名：' + fileName + '\n请到浏览器的“下载”里查看。');
-    } catch (e) {
-      alert('导出失败，请重试。\n' + (e && e.message ? e.message : ''));
-    }
+
+    sendNotify('📤 正在导出', '正在生成加密备份文件，请稍等…');
+
+    const result = store.exportData(password, function (fileName) {
+      lastExportedFileName = fileName;
+      sendNotify('✅ 导出完成', '文件已生成，可在手机「文件管理 - 下载」中查找。文件名：' + fileName);
+      showExportSuccess(fileName);
+    });
+
+    if (result === 'writing') return;
+    if (!result) return;
+
+    lastExportedFileName = result;
+    sendNotify('✅ 导出完成', '文件已下载。文件名：' + result);
+    showExportSuccess(result);
   }
 
   function importData(file) {
@@ -351,10 +477,13 @@
     const password = prompt('请输入导入密码：');
     if (!password) return;
     store.importData(file, password).then(() => {
+      sendNotify('✅ 导入成功', '数据已恢复，页面即将刷新。');
       alert('数据导入成功！页面即将刷新。');
       location.reload();
     }).catch(err => {
-      alert(err.message || '导入失败，密码错误或文件损坏。');
+      const msg = err.message || '导入失败，密码错误或文件损坏。';
+      sendNotify('❌ 导入失败', msg);
+      alert(msg);
     });
   }
 
@@ -538,6 +667,15 @@
     noteEl = $('#note');
     noteEl.value = App.state.day.note;
 
+    inputEl = $('#input');
+    inputEl.addEventListener('input', autoGrowInput);
+    inputEl.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        addTodo();
+      }
+    });
+
     updateHero();
     buildStrip();
     renderTodayList();
@@ -550,22 +688,15 @@
     });
 
     $('#addBtn').addEventListener('click', addTodo);
-    $('#input').addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); addTodo(); }
-    });
 
-    /* ★ 用 pointerup 处理点击，比 click 更快更稳 */
-    $('#list').addEventListener('pointerup', e => {
-      /* 如果处于编辑状态，且不是点 input，就不处理 */
+    $('#list').addEventListener('click', e => {
       const li = e.target.closest('.item');
       if (!li) return;
-
       const day = App.state.day;
       const id = li.dataset.id;
       const t = day.todos.find(x => x.id === id);
       if (!t) return;
 
-      /* 删除 */
       if (e.target.closest('.del')) {
         day.todos = day.todos.filter(x => x.id !== id);
         store.save();
@@ -573,13 +704,6 @@
         return;
       }
 
-      /* 修改 */
-      if (e.target.closest('.edit')) {
-        startEdit(li, t);
-        return;
-      }
-
-      /* 星标 */
       if (e.target.closest('.star-btn')) {
         t.starred = !t.starred;
         store.save();
@@ -587,7 +711,6 @@
         return;
       }
 
-      /* 打勾 或 点文字 */
       if (e.target.closest('.check') || e.target.closest('.txt')) {
         if (li.dataset.editing) return;
         if (App.state.selectedDateKey !== App.state.todayKey) {
@@ -603,7 +726,6 @@
       }
     });
 
-    /* 键盘可访问性 */
     $('#list').addEventListener('keydown', e => {
       if (e.key !== 'Enter' && e.key !== ' ') return;
       const c = e.target.closest('.check');
@@ -652,6 +774,8 @@
     openSettings, closeSettings,
     exportData, importData,
     exportMarkdown, copyOutput,
-    generateAISummary
+    generateAISummary,
+    openExportFolder, closeExportModal,
+    shareExportFile
   };
 })(window.App);

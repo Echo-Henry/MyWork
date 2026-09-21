@@ -78,6 +78,26 @@
     return false;
   }
 
+  /* ============ 导出文件位置描述 ============ */
+  function getExportPathDesc(fileName) {
+    fileName = fileName || lastExportedFileName || '好好生活数据备份_YYYY-MM-DD.workbench';
+
+    if (!window.plus || plus.os.name !== 'Android') {
+      return '浏览器「下载」文件夹 / ' + fileName;
+    }
+
+    // 尝试获取应用外部存储目录
+    try {
+      const main = plus.android.runtimeMainActivity();
+      const filesDir = main.getExternalFilesDir(null);
+      if (filesDir) {
+        return filesDir.getAbsolutePath() + '/' + fileName;
+      }
+    } catch (e) {}
+
+    return '内部存储/Download/ 或 Android/data/<应用包名>/files/\n文件名：' + fileName;
+  }
+
   /* ============ 日期条 ============ */
   function buildStrip() {
     const strip = $('#dateStrip');
@@ -395,60 +415,85 @@
 
   /* ============ 打开文件所在文件夹 ============ */
   function openExportFolder() {
+    // 浏览器环境：直接提示
     if (!window.plus || plus.os.name !== 'Android') {
+      sendNotify('📂 文件位置', '文件已保存到浏览器「下载」文件夹。\n文件名：' + lastExportedFileName);
       alert('文件已保存到「下载」文件夹。\n\n文件名：' + lastExportedFileName);
       return;
     }
 
-    // 判断当前是不是处于无线调试基座
-    var isBaseApp = (plus.runtime.appid === 'HBuilder');
-    var appFolder = isBaseApp ? 'io.dcloud.HBuilder' : plus.runtime.appid;
+    let success = false;
 
-    // 给用户一个清晰无误的路径提示
-    var pathDesc = '内部存储 -> Android -> data -> ' + appFolder + ' -> files -> Documents';
-
-    alert('文件已保存在：\n' + pathDesc + '\n\n文件名：' + lastExportedFileName + '\n\n如果您在文件管理里找不到，请直接使用“分享到微信”功能发送文件。');
-
-    // 尝试帮你打开系统的“文件管理”App
+    // 尝试 1：打开系统根目录
     try {
-      var main = plus.android.runtimeMainActivity();
-      var Intent = plus.android.importClass('android.content.Intent');
-      // ACTION_MAIN 配合 APP_FILES 类别，通常能直接唤起华为/荣耀的文件管理器
-      var intent = new Intent('android.intent.action.MAIN');
-      intent.addCategory('android.intent.category.APP_FILES');
-      intent.addFlags(268435456);
+      const main = plus.android.runtimeMainActivity();
+      const Intent = plus.android.importClass('android.content.Intent');
+      const Uri = plus.android.importClass('android.net.Uri');
+
+      const intent = new Intent('android.intent.action.VIEW');
+      intent.setDataAndType(Uri.parse('content://com.android.externalstorage.documents/root/primary'), 'resource/folder');
+      intent.addFlags(268435456); // FLAG_ACTIVITY_NEW_TASK
       main.startActivity(intent);
-    } catch (e) {
-      // 如果打不开就算了，前面弹窗已经把路径说得很清楚了
-    }
-  }
-
-  /* ============ 分享导出文件到微信 ============ */
-  function shareExportFile() {
-    if (!lastExportedFileName) {
-      alert('没有可分享的文件，请先导出数据。');
-      return;
+      success = true;
+    } catch (e1) {
+      success = false;
     }
 
-    if (!window.plus || !plus.share) {
-      alert('请在 App 内使用分享功能。');
-      return;
+    // 尝试 2：打开下载目录
+    if (!success) {
+      try {
+        const main = plus.android.runtimeMainActivity();
+        const Intent = plus.android.importClass('android.content.Intent');
+        const Uri = plus.android.importClass('android.net.Uri');
+
+        const intent = new Intent('android.intent.action.VIEW');
+        intent.setDataAndType(Uri.parse('content://downloads/public_downloads'), 'resource/folder');
+        intent.addFlags(268435456);
+        main.startActivity(intent);
+        success = true;
+      } catch (e2) {
+        success = false;
+      }
     }
 
-    plus.io.requestFileSystem(plus.io.PUBLIC_DOCUMENTS, function (fs) {
-      fs.root.getFile(lastExportedFileName, { create: false }, function (fileEntry) {
-        plus.share.sendWithSystem({
-          type: 'file',
-          filePath: fileEntry.fullPath
-        }, function () {}, function (e) {
-          alert('分享失败：' + (e.message || '未知错误'));
-        });
-      }, function (e) {
-        alert('找不到导出文件，请重新导出一次。');
-      });
-    }, function (e) {
-      alert('获取文件系统失败：' + (e.message || '未知错误'));
-    });
+    // 尝试 3：调用第三方文件管理器
+    if (!success) {
+      try {
+        const main = plus.android.runtimeMainActivity();
+        const Intent = plus.android.importClass('android.content.Intent');
+
+        const intent = new Intent('android.intent.action.GET_CONTENT');
+        intent.setType('*/*');
+        intent.addFlags(268435456);
+        main.startActivity(intent);
+        success = true;
+      } catch (e3) {
+        success = false;
+      }
+    }
+
+    // 全部失败：用通知 + 弹窗告知位置
+    if (!success) {
+      const pathDesc = getExportPathDesc(lastExportedFileName);
+      const notifyOK = sendNotify(
+        '📂 无法自动打开文件管理器',
+        '请手动打开手机「文件管理」App 查找：\n' + pathDesc
+      );
+
+      let alertMsg = '当前设备不支持自动跳转文件管理器。\n\n' +
+        '请手动打开手机自带的「文件管理」App，查找文件：\n\n' +
+        '📄 ' + lastExportedFileName + '\n\n' +
+        '可能位置：\n' +
+        '· 内部存储/Download/\n' +
+        '· Android/data/<应用包名>/files/\n\n' +
+        '换手机时用新设备 App 里的「导入数据」选择这个文件即可恢复。';
+
+      if (notifyOK) {
+        alertMsg += '\n\n（已发送通知到通知栏，下拉可查看）';
+      }
+
+      alert(alertMsg);
+    }
   }
 
   /* ============ 导出加密数据 ============ */
@@ -456,19 +501,31 @@
     const password = prompt('请设置导出密码（用于换机导入）：');
     if (!password) return;
 
+    // 通知：开始导出
     sendNotify('📤 正在导出', '正在生成加密备份文件，请稍等…');
 
+    // 传入回调，APK 环境等原生文件写完才弹成功窗
     const result = store.exportData(password, function (fileName) {
       lastExportedFileName = fileName;
-      sendNotify('✅ 导出完成', '文件已生成，可在手机「文件管理 - 下载」中查找。文件名：' + fileName);
+
+      // 通知：导出完成
+      sendNotify(
+        '✅ 导出完成',
+        '文件已生成，可在手机「文件管理 - 下载」中查找。\n文件名：' + fileName
+      );
+
       showExportSuccess(fileName);
     });
 
+    // 如果是异步写入中（APK 环境），这里不做额外处理
     if (result === 'writing') return;
+
+    // 如果同步返回 null（说明浏览器下载失败），不弹窗
     if (!result) return;
 
+    // 浏览器环境：同步返回了文件名，直接弹窗
     lastExportedFileName = result;
-    sendNotify('✅ 导出完成', '文件已下载。文件名：' + result);
+    sendNotify('✅ 导出完成', '文件已下载。\n文件名：' + result);
     showExportSuccess(result);
   }
 
@@ -775,7 +832,6 @@
     exportData, importData,
     exportMarkdown, copyOutput,
     generateAISummary,
-    openExportFolder, closeExportModal,
-    shareExportFile
+    openExportFolder, closeExportModal
   };
 })(window.App);

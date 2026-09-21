@@ -20,20 +20,12 @@ body{
   background:var(--bg);color:var(--text);
   min-height:100vh;overflow-x:hidden;
   -webkit-font-smoothing:antialiased;
-  /* 关键：禁止长按选中文字，防止拖动误触 */
   -webkit-touch-callout:none;
-  -webkit-user-select:none;
-  -moz-user-select:none;
-  user-select:none;
-  /* 关键：允许垂直滚动，不等待点击延迟 */
+  -webkit-user-select:none;-moz-user-select:none;user-select:none;
   touch-action:pan-y;
 }
-
-/* 输入框恢复可选文字 */
 input, textarea{
-  -webkit-user-select:text;
-  -moz-user-select:text;
-  user-select:text;
+  -webkit-user-select:text;-moz-user-select:text;user-select:text;
   touch-action:manipulation;
 }
 
@@ -135,11 +127,34 @@ input, textarea{
 .cat{border:1px solid var(--line);background:#fff;color:var(--text-2);padding:6px 14px;border-radius:999px;font-size:13px;cursor:pointer;transition:all .2s;font-family:inherit;font-weight:600;touch-action:manipulation}
 .cat.active{background:var(--pink);color:#fff;border-color:var(--pink);box-shadow:0 8px 16px -9px rgba(255,122,156,1)}
 
-.add-row{display:flex;gap:10px;margin-bottom:16px}
-#input{flex:1;min-width:0;border:1.5px solid var(--line);background:#FFFBFB;border-radius:16px;padding:13px 16px;font-size:15px;font-family:inherit;color:var(--text);outline:none;transition:all .25s}
+/* ============ 新增待办输入栏（多行 textarea） ============ */
+.add-row{display:flex;gap:10px;margin-bottom:16px;align-items:flex-start}
+#input{
+  flex:1;min-width:0;
+  border:1.5px solid var(--line);background:#FFFBFB;
+  border-radius:16px;padding:13px 16px;
+  font-size:15px;font-family:inherit;color:var(--text);
+  outline:none;transition:border-color .25s, box-shadow .25s, background .25s;
+  resize:none;
+  line-height:1.5;
+  min-height:48px;
+  max-height:140px;
+  overflow-y:auto;
+  word-break:break-word;
+  white-space:pre-wrap;
+}
 #input::placeholder{color:#CDBFC4}
 #input:focus{border-color:var(--pink-2);background:#fff;box-shadow:0 0 0 4px rgba(255,122,156,.1)}
-.add-btn{width:52px;flex:0 0 auto;border:none;border-radius:16px;background:linear-gradient(135deg,#FF8FAC,#FF6B90);color:#fff;font-size:24px;line-height:1;cursor:pointer;font-family:inherit;box-shadow:0 10px 22px -12px rgba(255,107,144,1);transition:transform .15s;touch-action:manipulation}
+.add-btn{
+  width:52px;height:52px;flex:0 0 auto;
+  border:none;border-radius:16px;
+  background:linear-gradient(135deg,#FF8FAC,#FF6B90);
+  color:#fff;font-size:24px;line-height:1;
+  cursor:pointer;font-family:inherit;
+  box-shadow:0 10px 22px -12px rgba(255,107,144,1);
+  transition:transform .15s;
+  touch-action:manipulation;
+}
 .add-btn:active{transform:scale(.93)}
 
 /* ============ 待办列表 ============ */
@@ -147,9 +162,7 @@ input, textarea{
 .item{
   display:flex;align-items:center;gap:9px;padding:11px 8px;border-radius:16px;
   transition:background .2s;
-  /* 关键：允许垂直滚动传给父级，禁止浏览器处理水平手势 */
   touch-action:pan-y;
-  /* 防止长按选中 */
   -webkit-user-select:none;user-select:none;
 }
 .item.new{animation:slideIn .32s cubic-bezier(.2,.9,.3,1.3)}
@@ -208,11 +221,58 @@ input, textarea{
 .tag[data-cat="other"]{background:#FFF1E4;color:#E09A5B}
 
 .star-btn{flex:0 0 auto;padding:2px 4px;cursor:pointer;transition:transform 0.15s;font-size:15px;line-height:1;touch-action:manipulation}
+/* ★ 拖动把手 */
+.drag-handle{
+  flex: 0 0 auto;
+  width: 26px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  color: #CDBFC4;
+  cursor: grab;
+  /* 关键：把手上不响应页面滚动，交给拖拽 */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  border-radius: 8px;
+  transition: color .15s, background .15s, transform .15s;
+  line-height: 1;
+  font-family: inherit;
+}
+.drag-handle:active{
+  color: var(--pink);
+  background: var(--pink-soft);
+  cursor: grabbing;
+  transform: scale(1.1);
+}
+
+/* 手机端把手稍微大一点，好按 */
+@media (max-width:640px){
+  .drag-handle{
+    width: 30px;
+    height: 34px;
+    font-size: 16px;
+  }
+}
+@media (max-width:360px){
+  .drag-handle{
+    width: 26px;
+    height: 30px;
+    font-size: 15px;
+  }
+}
+
+/* 拖拽中把手的样式 */
+.sortable-chosen .drag-handle{
+  color: var(--pink);
+  background: var(--pink-soft);
+}
 .star-btn.active{filter:drop-shadow(0 0 4px #FF7A9C)}
 
 .edit, .del{
   flex: 0 0 auto;
-  width: 28px;height: 28px;
+  width: 30px;height: 30px;
   border-radius: 10px;
   border: none;
   display: grid;place-items: center;
@@ -228,7 +288,6 @@ input, textarea{
 .del{background: var(--red-soft);color: var(--red);}
 .edit:active,.del:active{transform:scale(.9)}
 
-/* ============ 只对有鼠标的设备启用 hover ============ */
 @media (hover: hover) {
   .item:hover{background:#FFFAFB}
   .check:hover{border-color:var(--pink-2)}
@@ -312,7 +371,6 @@ input, textarea{
 .confetti{position:fixed;top:-40px;z-index:99;pointer-events:none;animation:fall 2.4s ease-in forwards}
 @keyframes fall{to{transform:translateY(108vh) rotate(420deg);opacity:0}}
 
-/* Sortable 拖拽时的样式 */
 .sortable-ghost{opacity:.35;background:#FFE8EE!important;border-radius:16px}
 .sortable-chosen{box-shadow:0 14px 30px -10px rgba(255,122,156,.6);background:#fff!important;transform:scale(1.02)}
 .sortable-drag{opacity:1!important}
@@ -330,7 +388,36 @@ input, textarea{
 .btn.ghost{background:#fff;color:var(--pink);border:1.5px solid var(--pink-soft)}
 .btn.danger{background:#FFE8EE;color:#E05A7C}
 
-/* ============ 历史搜索 ============ */
+/* 导出成功弹窗 */
+.export-info{
+  background:#FFFBFB;
+  border-radius:14px;
+  padding:14px 16px;
+  font-size:13.5px;
+  line-height:1.7;
+  color:var(--text-2);
+  margin-bottom:12px;
+}
+.export-info strong{
+  display:block;
+  color:var(--text);
+  font-weight:700;
+  margin-top:6px;
+  word-break:break-all;
+  font-family:monospace;
+  font-size:13px;
+  color:var(--pink);
+}
+.export-tip{
+  font-size:12px;
+  color:#C4B4BA;
+  line-height:1.6;
+  margin-bottom:10px;
+  padding:9px 12px;
+  background:#FFF9F5;
+  border-radius:10px;
+}
+
 .search-card{padding:14px 18px;margin-bottom:20px}
 .search-box{display:flex;align-items:center;gap:10px;background:#FFFBFB;border:1.5px solid var(--line);border-radius:15px;padding:10px 14px;transition:all .22s}
 .search-box:focus-within{border-color:var(--pink-2);background:#fff;box-shadow:0 0 0 4px rgba(255,122,156,.1)}
@@ -349,7 +436,6 @@ input, textarea{
 .search-empty{text-align:center;padding:30px 0;color:#CDBFC4;font-size:13px;line-height:2}
 .search-empty .em{font-size:32px;display:block;margin-bottom:8px}
 
-/* ============ 手机端适配 ============ */
 @media (max-width:780px){
   .grid{grid-template-columns:1fr;gap:16px;margin-top:18px}
   .history-grid{gap:16px}
@@ -382,8 +468,8 @@ input, textarea{
   .cats{gap:6px;margin-bottom:11px}
   .cat{font-size:12.5px;padding:6px 12px}
   .add-row{gap:8px;margin-bottom:13px}
-  #input{padding:12px 14px;font-size:14px;border-radius:15px}
-  .add-btn{width:48px;font-size:22px;border-radius:15px}
+  #input{padding:12px 14px;font-size:14px;border-radius:15px;min-height:46px;max-height:130px}
+  .add-btn{width:48px;height:48px;font-size:22px;border-radius:15px}
 
   .item{padding:11px 6px;gap:7px;border-radius:14px}
   .num{min-width:20px;height:20px;font-size:11px;border-radius:6px}
@@ -392,7 +478,7 @@ input, textarea{
   .edit-input{font-size:14px;padding:8px 11px;border-radius:11px;min-height:38px;max-height:200px}
   .tag{font-size:10px;padding:2px 7px}
   .star-btn{font-size:15px;padding:3px}
-  .edit, .del{width:32px;height:32px;font-size:15px;border-radius:10px}
+  .edit, .del{width:34px;height:34px;font-size:16px;border-radius:11px}
 
   .moods{gap:6px;margin-top:12px}
   .mood{font-size:20px;border-radius:14px}
@@ -439,5 +525,18 @@ input, textarea{
   .mood{font-size:18px}
   .dchip{min-width:50px;padding:6px 9px}
   .dchip .d{font-size:12.5px}
-  .edit, .del{width:30px;height:30px;font-size:14px}
+  .edit, .del{width:32px;height:32px;font-size:15px}
+}
+
+/* 微信分享按钮 */
+.wechat-btn{
+  background: #07C160;
+  color: #fff;
+  box-shadow: 0 10px 22px -12px rgba(7, 193, 96, 0.8);
+}
+.wechat-btn:active{
+  transform: scale(.975);
+}
+.wechat-btn:hover{
+  box-shadow: 0 12px 26px -10px rgba(7, 193, 96, 1);
 }

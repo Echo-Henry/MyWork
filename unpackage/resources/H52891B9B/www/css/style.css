@@ -527,16 +527,3 @@ input, textarea{
   .dchip .d{font-size:12.5px}
   .edit, .del{width:32px;height:32px;font-size:15px}
 }
-
-/* 微信分享按钮 */
-.wechat-btn{
-  background: #07C160;
-  color: #fff;
-  box-shadow: 0 10px 22px -12px rgba(7, 193, 96, 0.8);
-}
-.wechat-btn:active{
-  transform: scale(.975);
-}
-.wechat-btn:hover{
-  box-shadow: 0 12px 26px -10px rgba(7, 193, 96, 1);
-}

@@ -48,7 +48,7 @@
     return store;
   }
 
-  /* ============ 加密导出（写到公共 Documents 目录，绝不被隐藏） ============ */
+  /* ============ 加密导出（支持 APK 原生写入） ============ */
   function exportData(password, successCallback) {
     const dataStr = JSON.stringify(store);
     const utf8Str = encodeURIComponent(dataStr);
@@ -64,22 +64,11 @@
     /* 情况 A：APK 原生环境，使用 plus.io 写入手机存储 */
     if (window.plus && plus.io) {
       try {
-        // ★ 关键改动：使用 PUBLIC_DOCUMENTS 代替 PUBLIC_DOWNLOADS
-        plus.io.requestFileSystem(plus.io.PUBLIC_DOCUMENTS, function (fs) {
+        plus.io.requestFileSystem(plus.io.PUBLIC_DOWNLOADS, function (fs) {
           fs.root.getFile(fileName, { create: true }, function (fileEntry) {
             fileEntry.createWriter(function (writer) {
               writer.write(base64);
               writer.onwrite = function () {
-                // 写入成功后，通知系统扫描，让文件管理器能立刻看到
-                if (window.plus && plus.android) {
-                  try {
-                    var main = plus.android.runtimeMainActivity();
-                    var MediaScannerConnection = plus.android.importClass('android.media.MediaScannerConnection');
-                    var File = plus.android.importClass('java.io.File');
-                    var f = new File(fileEntry.fullPath);
-                    MediaScannerConnection.scanFile(main, [f.getAbsolutePath()], null, null);
-                  } catch (e) {}
-                }
                 if (typeof successCallback === 'function') {
                   successCallback(fileName);
                 }
@@ -94,12 +83,12 @@
             alert('创建文件失败：' + (e.message || '未知错误'));
           });
         }, function (e) {
-          alert('获取手机文档目录失败：' + (e.message || '未知错误'));
+          alert('获取手机下载目录失败：' + (e.message || '未知错误'));
         });
       } catch (e) {
         alert('调用原生文件系统失败：' + e.message);
       }
-      return 'writing';
+      return 'writing'; // 异步写入中
     }
 
     /* 情况 B：浏览器环境，使用 Blob 下载 */
