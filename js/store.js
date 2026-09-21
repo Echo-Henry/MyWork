@@ -48,7 +48,7 @@
     return store;
   }
 
-  /* ============ 加密导出（写到公共 Documents 目录，绝不被隐藏） ============ */
+  /* ============ 加密导出（写入公共 Download 目录） ============ */
   function exportData(password, successCallback) {
     const dataStr = JSON.stringify(store);
     const utf8Str = encodeURIComponent(dataStr);
@@ -59,18 +59,17 @@
       );
     }
     const base64 = btoa(encrypted);
-    const fileName = '好好生活数据备份_' + App.state.todayKey + '.workbench';
+    const fileName = '好好生活数据备份_' + App.state.todayKey + '.txt';
 
-    /* 情况 A：APK 原生环境，使用 plus.io 写入手机存储 */
+    /* 情况 A：APK 原生环境，写入公共 Download 目录 */
     if (window.plus && plus.io) {
       try {
-        // ★ 关键改动：使用 PUBLIC_DOCUMENTS 代替 PUBLIC_DOWNLOADS
-        plus.io.requestFileSystem(plus.io.PUBLIC_DOCUMENTS, function (fs) {
+        // ★ 关键改动：用 PUBLIC_DOWNLOADS 而不是 PUBLIC_DOCUMENTS
+        plus.io.requestFileSystem(plus.io.PUBLIC_DOWNLOADS, function (fs) {
           fs.root.getFile(fileName, { create: true }, function (fileEntry) {
             fileEntry.createWriter(function (writer) {
               writer.write(base64);
               writer.onwrite = function () {
-                // 写入成功后，通知系统扫描，让文件管理器能立刻看到
                 if (window.plus && plus.android) {
                   try {
                     var main = plus.android.runtimeMainActivity();
@@ -81,7 +80,7 @@
                   } catch (e) {}
                 }
                 if (typeof successCallback === 'function') {
-                  successCallback(fileName);
+                  successCallback(fileName, fileEntry.fullPath);
                 }
               };
               writer.onerror = function (e) {
@@ -94,7 +93,7 @@
             alert('创建文件失败：' + (e.message || '未知错误'));
           });
         }, function (e) {
-          alert('获取手机文档目录失败：' + (e.message || '未知错误'));
+          alert('获取手机下载目录失败：' + (e.message || '未知错误'));
         });
       } catch (e) {
         alert('调用原生文件系统失败：' + e.message);
@@ -116,7 +115,7 @@
       setTimeout(() => URL.revokeObjectURL(url), 1500);
 
       if (typeof successCallback === 'function') {
-        successCallback(fileName);
+        successCallback(fileName, '');
       }
       return fileName;
     } catch (e) {
