@@ -127,7 +127,6 @@ input, textarea{
 .cat{border:1px solid var(--line);background:#fff;color:var(--text-2);padding:6px 14px;border-radius:999px;font-size:13px;cursor:pointer;transition:all .2s;font-family:inherit;font-weight:600;touch-action:manipulation}
 .cat.active{background:var(--pink);color:#fff;border-color:var(--pink);box-shadow:0 8px 16px -9px rgba(255,122,156,1)}
 
-/* ============ 新增待办输入栏（多行 textarea） ============ */
 .add-row{display:flex;gap:10px;margin-bottom:16px;align-items:flex-start}
 #input{
   flex:1;min-width:0;
@@ -157,7 +156,6 @@ input, textarea{
 }
 .add-btn:active{transform:scale(.93)}
 
-/* ============ 待办列表 ============ */
 .list{list-style:none;display:flex;flex-direction:column;gap:2px}
 .item{
   display:flex;align-items:center;gap:9px;padding:11px 8px;border-radius:16px;
@@ -221,7 +219,8 @@ input, textarea{
 .tag[data-cat="other"]{background:#FFF1E4;color:#E09A5B}
 
 .star-btn{flex:0 0 auto;padding:2px 4px;cursor:pointer;transition:transform 0.15s;font-size:15px;line-height:1;touch-action:manipulation}
-/* ★ 拖动把手 */
+.star-btn.active{filter:drop-shadow(0 0 4px #FF7A9C)}
+
 .drag-handle{
   flex: 0 0 auto;
   width: 26px;
@@ -231,7 +230,6 @@ input, textarea{
   font-size: 15px;
   color: #CDBFC4;
   cursor: grab;
-  /* 关键：把手上不响应页面滚动，交给拖拽 */
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
@@ -246,29 +244,6 @@ input, textarea{
   cursor: grabbing;
   transform: scale(1.1);
 }
-
-/* 手机端把手稍微大一点，好按 */
-@media (max-width:640px){
-  .drag-handle{
-    width: 30px;
-    height: 34px;
-    font-size: 16px;
-  }
-}
-@media (max-width:360px){
-  .drag-handle{
-    width: 26px;
-    height: 30px;
-    font-size: 15px;
-  }
-}
-
-/* 拖拽中把手的样式 */
-.sortable-chosen .drag-handle{
-  color: var(--pink);
-  background: var(--pink-soft);
-}
-.star-btn.active{filter:drop-shadow(0 0 4px #FF7A9C)}
 
 .edit, .del{
   flex: 0 0 auto;
@@ -388,7 +363,6 @@ input, textarea{
 .btn.ghost{background:#fff;color:var(--pink);border:1.5px solid var(--pink-soft)}
 .btn.danger{background:#FFE8EE;color:#E05A7C}
 
-/* 导出成功弹窗 */
 .export-info{
   background:#FFFBFB;
   border-radius:14px;
@@ -408,14 +382,46 @@ input, textarea{
   font-size:13px;
   color:var(--pink);
 }
-.export-tip{
-  font-size:12px;
-  color:#C4B4BA;
-  line-height:1.6;
-  margin-bottom:10px;
-  padding:9px 12px;
-  background:#FFF9F5;
-  border-radius:10px;
+
+/* ============ 导出路径显示 ============ */
+.export-path-label{
+  font-size: 12.5px;
+  color: var(--text-2);
+  margin: 14px 0 8px;
+  font-weight: 600;
+}
+
+.export-path-box{
+  background: #FFFBFB;
+  border: 1.5px dashed var(--pink-2);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text);
+  word-break: break-all;
+  font-family: monospace;
+  margin-bottom: 10px;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default !important;
+  cursor: text;
+}
+
+.export-path-box span{
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
+.export-path-tip{
+  font-size: 11.5px;
+  color: #C4B4BA;
+  line-height: 1.6;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  background: #FFF9F5;
+  border-radius: 9px;
 }
 
 .search-card{padding:14px 18px;margin-bottom:20px}
@@ -478,6 +484,7 @@ input, textarea{
   .edit-input{font-size:14px;padding:8px 11px;border-radius:11px;min-height:38px;max-height:200px}
   .tag{font-size:10px;padding:2px 7px}
   .star-btn{font-size:15px;padding:3px}
+  .drag-handle{width:30px;height:34px;font-size:16px}
   .edit, .del{width:34px;height:34px;font-size:16px;border-radius:11px}
 
   .moods{gap:6px;margin-top:12px}
@@ -511,6 +518,8 @@ input, textarea{
   .search-item{padding:10px 10px;gap:8px}
   .si-date{font-size:11px;padding:2px 7px}
   .si-text{font-size:13.5px}
+
+  .export-path-box{font-size:12px;padding:10px 12px}
 }
 @media (max-width:360px){
   .brand{font-size:13px}
@@ -526,17 +535,5 @@ input, textarea{
   .dchip{min-width:50px;padding:6px 9px}
   .dchip .d{font-size:12.5px}
   .edit, .del{width:32px;height:32px;font-size:15px}
-}
-
-/* 微信分享按钮 */
-.wechat-btn{
-  background: #07C160;
-  color: #fff;
-  box-shadow: 0 10px 22px -12px rgba(7, 193, 96, 0.8);
-}
-.wechat-btn:active{
-  transform: scale(.975);
-}
-.wechat-btn:hover{
-  box-shadow: 0 12px 26px -10px rgba(7, 193, 96, 1);
+  .drag-handle{width:26px;height:30px;font-size:15px}
 }

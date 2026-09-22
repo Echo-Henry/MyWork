@@ -167,16 +167,24 @@
   </div>
 </div>
 
-<!-- 导出成功弹窗（已移除微信分享按钮） -->
+<!-- 导出成功弹窗（显示路径 + 可复制） -->
 <div id="exportModal" class="modal" style="display:none;">
   <div class="modal-content">
     <h2>📤 导出成功</h2>
+
     <div class="export-info">
       <span>文件名：</span>
       <strong id="exportFileName">—</strong>
     </div>
-    <p class="export-tip" id="exportPathTip">💡 文件已保存到手机存储，点下方按钮可尝试打开</p>
-    <button class="btn" onclick="App.today.openExportFolder()">📂 打开文件夹</button>
+
+    <p class="export-path-label">📂 文件完整路径（长按可复制）：</p>
+    <div class="export-path-box" id="exportPathBox">
+      <span id="exportPathText">—</span>
+    </div>
+
+    <p class="export-path-tip">💡 打开手机「文件管理」App，进入上述路径即可找到文件</p>
+
+    <button class="btn" onclick="App.today.copyExportPath()">📋 复制路径</button>
     <button class="btn ghost" onclick="App.today.closeExportModal()">关闭</button>
   </div>
 </div>

@@ -11,9 +11,6 @@
   let noteEl = null;
   let inputEl = null;
   let lastExportedFileName = '';
-  let lastExportedFilePath = '';
-
-  const pad2 = n => String(n).padStart(2, '0');
 
   function greetingByHour() {
     const h = new Date().getHours();
@@ -63,16 +60,6 @@
     }
 
     $('#quote').textContent = '「 ' + QUOTES[seed % QUOTES.length] + ' 」';
-  }
-
-  function sendNotify(title, content) {
-    if (window.plus && plus.push && plus.push.createMessage) {
-      try {
-        plus.push.createMessage(content, 'LocalMsg', { title: title });
-        return true;
-      } catch (e) {}
-    }
-    return false;
   }
 
   function buildStrip() {
@@ -360,99 +347,71 @@
   function openSettings() { $('#settingsModal').style.display = 'flex'; }
   function closeSettings() { $('#settingsModal').style.display = 'none'; }
 
+  /* ============ 导出成功弹窗（显示可复制的路径） ============ */
   function showExportSuccess(fileName) {
     lastExportedFileName = fileName;
-    const el = document.getElementById('exportFileName');
-    if (el) el.textContent = fileName;
 
-    const tipEl = document.getElementById('exportPathTip');
-    if (tipEl) {
-      tipEl.textContent = '💡 文件已保存到手机存储，点下方按钮可尝试打开。';
+    var nameEl = document.getElementById('exportFileName');
+    if (nameEl) nameEl.textContent = fileName;
+
+    var appId = '你的包名';
+    if (window.plus && plus.runtime && plus.runtime.appid) {
+      appId = plus.runtime.appid;
     }
+    var fullPath = '内部存储/Android/data/' + appId + '/files/Download/' + fileName;
 
-    const modal = document.getElementById('exportModal');
+    var pathEl = document.getElementById('exportPathText');
+    if (pathEl) pathEl.textContent = fullPath;
+
+    window._lastExportPath = fullPath;
+
+    var modal = document.getElementById('exportModal');
     if (modal) modal.style.display = 'flex';
   }
 
   function closeExportModal() {
-    const modal = document.getElementById('exportModal');
+    var modal = document.getElementById('exportModal');
     if (modal) modal.style.display = 'none';
   }
 
-  /* ============ 打开文件所在文件夹 ============ */
-  function openExportFolder() {
-    if (!window.plus || plus.os.name !== 'Android') {
-      alert('文件已保存到「下载」文件夹。\n\n文件名：' + lastExportedFileName);
+  /* ============ 复制导出路径 ============ */
+  function copyExportPath() {
+    var path = window._lastExportPath || '';
+    if (!path) {
+      alert('没有可复制的路径');
       return;
     }
 
-    var main = plus.android.runtimeMainActivity();
-    var Intent = plus.android.importClass('android.content.Intent');
-    var Uri = plus.android.importClass('android.net.Uri');
-    var FLAG_NEW_TASK = 268435456;
-    var success = false;
-
-    /* 方案 1：用 DocumentsContract 直接定位到公共 Download 目录 */
-    if (!success) {
-      try {
-        var DocumentsContract = plus.android.importClass('android.provider.DocumentsContract');
-        var uri = DocumentsContract.buildDocumentUri(
-          'com.android.externalstorage.documents',
-          'primary:Download'
-        );
-        var intent = new Intent(Intent.ACTION_VIEW);
-        intent.setDataAndType(uri, 'vnd.android.document/directory');
-        intent.addFlags(FLAG_NEW_TASK);
-        main.startActivity(intent);
-        success = true;
-      } catch (e1) { success = false; }
+    if (window.plus && plus.navigator && plus.navigator.setClipboardData) {
+      plus.navigator.setClipboardData(path, function () {
+        alert('✅ 路径已复制\n\n请打开「文件管理」App，按路径查找。');
+      }, function () {
+        fallbackCopy(path);
+      });
+      return;
     }
 
-    /* 方案 2：用 content:// URI 直接打开 Download 目录 */
-    if (!success) {
-      try {
-        var uri2 = Uri.parse('content://com.android.externalstorage.documents/document/primary%3ADownload');
-        var intent2 = new Intent(Intent.ACTION_VIEW);
-        intent2.setDataAndType(uri2, 'vnd.android.document/directory');
-        intent2.addFlags(FLAG_NEW_TASK);
-        main.startActivity(intent2);
-        success = true;
-      } catch (e2) { success = false; }
-    }
+    fallbackCopy(path);
+  }
 
-    /* 方案 3：尝试启动华为/荣耀自带文件管理器 */
-    if (!success) {
-      var pkgs = [
-        'com.huawei.hidisk',
-        'com.huawei.filemanager',
-        'com.android.documentsui'
-      ];
-      for (var i = 0; i < pkgs.length; i++) {
-        try {
-          var launchIntent = main.getPackageManager().getLaunchIntentForPackage(pkgs[i]);
-          if (launchIntent) {
-            launchIntent.addFlags(FLAG_NEW_TASK);
-            main.startActivity(launchIntent);
-            success = true;
-            break;
-          }
-        } catch (e3) { /* 继续试 */ }
+  function fallbackCopy(text) {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
+      var ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (ok) {
+        alert('✅ 路径已复制');
+      } else {
+        alert('复制失败，请长按路径文本手动复制。');
       }
-    }
-
-    /* 方案 4：系统文件选择器兜底 */
-    if (!success) {
-      try {
-        var intent4 = new Intent(Intent.ACTION_GET_CONTENT);
-        intent4.setType('*/*');
-        intent4.addFlags(FLAG_NEW_TASK);
-        main.startActivity(intent4);
-        success = true;
-      } catch (e4) { success = false; }
-    }
-
-    if (!success) {
-      alert('当前设备不支持自动跳转。\n\n请手动打开手机自带的「文件管理」App → 点「下载」分类，找到：\n\n' + lastExportedFileName);
+    } catch (e) {
+      alert('复制失败，请长按路径文本手动复制。');
     }
   }
 
@@ -461,12 +420,8 @@
     const password = prompt('请设置导出密码（用于换机导入）：');
     if (!password) return;
 
-    sendNotify('📤 正在导出', '正在生成加密备份文件，请稍等…');
-
-    const result = store.exportData(password, function (fileName, filePath) {
+    const result = store.exportData(password, function (fileName) {
       lastExportedFileName = fileName;
-      lastExportedFilePath = filePath || '';
-      sendNotify('✅ 导出完成', '文件已生成，可在手机「文件管理」中查找。文件名：' + fileName);
       showExportSuccess(fileName);
     });
 
@@ -474,7 +429,6 @@
     if (!result) return;
 
     lastExportedFileName = result;
-    sendNotify('✅ 导出完成', '文件已下载。文件名：' + result);
     showExportSuccess(result);
   }
 
@@ -483,13 +437,10 @@
     const password = prompt('请输入导入密码：');
     if (!password) return;
     store.importData(file, password).then(() => {
-      sendNotify('✅ 导入成功', '数据已恢复，页面即将刷新。');
       alert('数据导入成功！页面即将刷新。');
       location.reload();
     }).catch(err => {
-      const msg = err.message || '导入失败，密码错误或文件损坏。';
-      sendNotify('❌ 导入失败', msg);
-      alert(msg);
+      alert(err.message || '导入失败，密码错误或文件损坏。');
     });
   }
 
@@ -779,6 +730,7 @@
     exportData, importData,
     exportMarkdown, copyOutput,
     generateAISummary,
-    openExportFolder, closeExportModal
+    copyExportPath,
+    closeExportModal
   };
 })(window.App);
