@@ -91,6 +91,6 @@
 
 ```bash
 # 克隆仓库
-git clone <你的仓库地址>
+git clone https://github.com/Echo-Henry/MyWork.git
 
 # 用浏览器直接打开 index.html 即可
