@@ -400,7 +400,7 @@
     var nameEl = document.getElementById('exportFileName');
     if (nameEl) nameEl.textContent = fileName;
 
-    var appId = '你的包名';
+    var appId = 'personnel.MyWork.Echo';
     if (window.plus && plus.runtime && plus.runtime.appid) {
       appId = plus.runtime.appid;
     }
