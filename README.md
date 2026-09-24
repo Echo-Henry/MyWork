@@ -91,7 +91,7 @@
 
 1. 点击本页面右侧的 **Releases**（或点击 [这里](https://github.com/Echo-Henry/MyWork/releases/tag/v1.5))。
 2. 找到最新的 `好好生活 v1.5` 版本。
-3. 在 `Assets` 里点击下载 `app-release.apk` 文件。
+3. 在 `Assets` 里点击下载 `MyWork.for.android_V1.5.apk` 文件。
 4. 把 APK 传到你的华为/荣耀手机上安装即可（首次安装需允许“未知来源应用”）。
 
 > ⚠️ 首次安装如果提示“安全警告”，请选择“继续安装”。
