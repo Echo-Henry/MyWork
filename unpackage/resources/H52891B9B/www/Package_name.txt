@@ -1,1 +1,0 @@
-package_name: personnel.MyWork.Echo
