@@ -40,7 +40,7 @@ window.App = window.App || {};
 
     WEEK_CN: ['日', '一', '二', '三', '四', '五', '六'],
 
-    // 预留 AI 配置（未来填智谱等平台的 API Key）
+    // 预留 AI 配置（未来填智谱等平台的 API Key，原先测试用的我自己的apikey，未防止恶意利用，已删除）
     AI_API_KEY: '',
     AI_API_URL: 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
   };
