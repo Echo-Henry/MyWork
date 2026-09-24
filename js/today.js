@@ -344,8 +344,54 @@
       : '点一下记录心情吧';
   }
 
-  function openSettings() { $('#settingsModal').style.display = 'flex'; }
+  function openSettings() { 
+    $('#settingsModal').style.display = 'flex';
+    loadUserApiKey();
+  }
   function closeSettings() { $('#settingsModal').style.display = 'none'; }
+
+  /* ============ 用户自定义 API Key ============ */
+  function saveUserApiKey() {
+    var el = document.getElementById('userApiKey');
+    if (!el) return;
+    var v = el.value.trim();
+    if (!v) {
+      alert('请先粘贴你的 API Key');
+      return;
+    }
+    try {
+      localStorage.setItem('user_ai_key', v);
+      alert('✅ 已保存！\n\n下次点「生成本月总结」时，会优先使用你的 Key。');
+    } catch (e) {
+      alert('保存失败：' + e.message);
+    }
+  }
+
+  function clearUserApiKey() {
+    try {
+      localStorage.removeItem('user_ai_key');
+    } catch (e) {}
+    var el = document.getElementById('userApiKey');
+    if (el) el.value = '';
+    alert('✅ 已清除');
+  }
+
+  function loadUserApiKey() {
+    var el = document.getElementById('userApiKey');
+    if (!el) return;
+    try {
+      el.value = localStorage.getItem('user_ai_key') || '';
+    } catch (e) {}
+  }
+
+  function getAIKey() {
+    var userKey = '';
+    try {
+      userKey = localStorage.getItem('user_ai_key') || '';
+    } catch (e) {}
+    if (userKey) return userKey;
+    return App.config.AI_API_KEY || '';
+  }
 
   /* ============ 导出成功弹窗（显示可复制的路径） ============ */
   function showExportSuccess(fileName) {
@@ -374,7 +420,6 @@
     if (modal) modal.style.display = 'none';
   }
 
-  /* ============ 复制导出路径 ============ */
   function copyExportPath() {
     var path = window._lastExportPath || '';
     if (!path) {
@@ -415,7 +460,6 @@
     }
   }
 
-  /* ============ 导出加密数据 ============ */
   function exportData() {
     const password = prompt('请设置导出密码（用于换机导入）：');
     if (!password) return;
@@ -498,6 +542,7 @@
     }
   }
 
+  /* ============ AI 月度总结（优先用用户自己的 Key） ============ */
   function generateAISummary() {
     const allData = (store.getAll ? store.getAll() : {}) || {};
     const allKeys = Object.keys(allData).sort();
@@ -539,7 +584,10 @@
 
     const rate = total ? Math.round(done / total * 100) : 0;
 
-    if (!App.config.AI_API_KEY) {
+    // ★ 取 Key：优先用户填的，其次 config.js 里的
+    const aiKey = getAIKey();
+
+    if (!aiKey) {
       let topMood = '';
       let maxM = 0;
       for (let m in moodCount) {
@@ -556,9 +604,10 @@
         '📊 本月记录 ' + total + ' 件待办，完成 ' + done + ' 件，完成率 ' + rate + '%。\n\n' +
         '✅ 你完成的事：\n' + doneText + '\n\n' +
         moodText + '。\n\n' + noteText + '\n\n' +
-        '数据全部保存在你的手机本地，没有上传到任何服务器。\n下个月也要继续好好生活呀！🌸';
+        '数据全部保存在你的手机本地，没有上传到任何服务器。\n下个月也要继续好好生活呀！🌸\n\n' +
+        '💡 想用 AI 生成更走心的总结？请到「设置 → AI 功能配置」填入你自己的智谱 API Key。';
 
-      $('#outputTitle').textContent = '🤖 AI 月度总结（本地版）';
+      $('#outputTitle').textContent = '🤖 月度总结（本地版）';
       $('#outputText').value = localText;
       $('#outputModal').style.display = 'flex';
       return;
@@ -590,7 +639,7 @@
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + App.config.AI_API_KEY
+        'Authorization': 'Bearer ' + aiKey
       },
       body: JSON.stringify({
         model: 'glm-4-flash',
@@ -604,7 +653,8 @@
         if (data.choices && data.choices[0] && data.choices[0].message) {
           aiText = data.choices[0].message.content;
         } else if (data.error) {
-          aiText = 'AI 返回错误：' + (data.error.message || JSON.stringify(data.error));
+          aiText = 'AI 返回错误：' + (data.error.message || JSON.stringify(data.error)) +
+            '\n\n💡 请检查你填写的 API Key 是否正确。';
         } else {
           aiText = 'AI 返回格式异常：' + JSON.stringify(data);
         }
@@ -613,7 +663,7 @@
       })
       .catch(err => {
         $('#outputText').value = '调用 AI 失败：' + err.message +
-          '\n\n请检查：\n1. 手机/电脑是否联网\n2. config.js 里的 API Key 是否填写正确';
+          '\n\n请检查：\n1. 手机/电脑是否联网\n2. 设置里填写的 API Key 是否正确';
         $('#outputTitle').textContent = '⚠️ AI 调用失败';
       });
   }
@@ -630,6 +680,8 @@
         addTodo();
       }
     });
+
+    loadUserApiKey();
 
     updateHero();
     buildStrip();
@@ -731,6 +783,8 @@
     exportMarkdown, copyOutput,
     generateAISummary,
     copyExportPath,
-    closeExportModal
+    closeExportModal,
+    saveUserApiKey,
+    clearUserApiKey
   };
 })(window.App);

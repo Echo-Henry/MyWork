@@ -139,6 +139,20 @@
 <div id="settingsModal" class="modal" style="display:none;">
   <div class="modal-content">
     <h2>⚙️ 设置</h2>
+
+    <!-- ★ 新增：AI 功能配置 -->
+    <div class="setting-item">
+      <h3>🔑 AI 功能配置</h3>
+      <p class="desc">填入你自己的智谱 API Key 即可使用 AI 月度总结。Key 只保存在你手机本地，不会上传到任何服务器。</p>
+      <input type="password" id="userApiKey" placeholder="粘贴你的智谱 API Key" 
+             style="width:100%;border:1.5px solid var(--line);background:#FFFBFB;border-radius:12px;padding:11px 14px;font-size:14px;font-family:inherit;color:var(--text);outline:none;margin-bottom:10px;">
+      <button class="btn ghost" onclick="App.today.saveUserApiKey()">💾 保存 Key</button>
+      <button class="btn ghost" onclick="App.today.clearUserApiKey()">🗑️ 清除 Key</button>
+      <p class="desc" style="margin-top:10px;font-size:11.5px;color:#C4B4BA;">
+        💡 如何获取 Key：访问 open.bigmodel.cn → 注册 → API Keys → 创建新的 Key
+      </p>
+    </div>
+
     <div class="setting-item">
       <h3>📦 数据备份与恢复</h3>
       <p class="desc">不联网工具换手机最怕数据丢失，导出加密文件，换机无忧。</p>
@@ -167,23 +181,18 @@
   </div>
 </div>
 
-<!-- 导出成功弹窗（显示路径 + 可复制） -->
 <div id="exportModal" class="modal" style="display:none;">
   <div class="modal-content">
     <h2>📤 导出成功</h2>
-
     <div class="export-info">
       <span>文件名：</span>
       <strong id="exportFileName">—</strong>
     </div>
-
     <p class="export-path-label">📂 文件完整路径（长按可复制）：</p>
     <div class="export-path-box" id="exportPathBox">
       <span id="exportPathText">—</span>
     </div>
-
     <p class="export-path-tip">💡 打开手机「文件管理」App，进入上述路径即可找到文件</p>
-
     <button class="btn" onclick="App.today.copyExportPath()">📋 复制路径</button>
     <button class="btn ghost" onclick="App.today.closeExportModal()">关闭</button>
   </div>
